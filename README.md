@@ -30,23 +30,15 @@ ai-invoice-accounting/
 
 ## Công nghệ
 
-| Thành phần | Công nghệ |
-|---|---|
+| Thành phần | Công nghệ                                                      |
+| ---------- | -------------------------------------------------------------- |
 | AI Service | Python + FastAPI, Google Cloud Vision API / Tesseract, LLM API |
-| Backend | Python + FastAPI, SQLAlchemy, Alembic |
-| Frontend | React + Vite + Tailwind CSS |
-| Database | MySQL 8.0 (chạy qua Docker) |
+| Backend    | Python + FastAPI, SQLAlchemy, Alembic                          |
+| Frontend   | React + Vite + Tailwind CSS                                    |
+| Database   | MySQL 8.0 (chạy qua Docker)                                    |
 
 Xem hướng dẫn cài đặt chi tiết tại [`SETUP.md`](./SETUP.md) — đặc biệt lưu ý
 phần cấu hình MySQL để tránh lỗi charset/kết nối khi cả nhóm cùng làm việc.
-
-## Thành viên nhóm & phân vai
-
-| Vai trò | Người phụ trách | Thư mục |
-|---|---|---|
-| AI/OCR Engineer | | `ai-service/` |
-| Backend Engineer | | `backend/` |
-| Frontend + PM | | `frontend/` |
 
 ## Hướng dẫn Setup
 
@@ -62,19 +54,23 @@ bản MySQL giống hệt nhau, tránh lỗi lệch cấu hình giữa các máy
   https://docs.docker.com/engine/install/
 
 Kiểm tra đã cài thành công:
+
 ```bash
 docker --version
 docker compose version
 ```
 
-### Bước 1: Chạy MySQL
+### Bước 1: Tạo file `.env` và chạy MySQL
 
 ```bash
+cp .env.example .env    # điền/giữ giá trị mặc định cho MySQL
 docker compose up -d mysql
 ```
+
 Lần đầu chạy sẽ mất vài phút để tải image MySQL 8.0.
 
 Kiểm tra MySQL đã sẵn sàng:
+
 ```bash
 docker compose ps        # trạng thái phải là "healthy"
 docker compose logs mysql
@@ -119,7 +115,3 @@ docker compose up -d mysql
 
 Xem thêm chi tiết nguyên tắc giữ MySQL ổn định (charset, kiểu dữ liệu tiền,
 connection pool, migration) tại [`SETUP.md`](./SETUP.md).
-
-## Tài liệu đồ án
-
-Xem chi tiết từng chương trong thư mục [`docs/`](./docs).
