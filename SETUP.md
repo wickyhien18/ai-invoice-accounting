@@ -1,30 +1,27 @@
-# Hướng dẫn Setup dự án — ai-invoice-accounting
+# Setup Guide — ai-invoice-accounting
 
-Stack đã chốt:
-
+Confirmed stack:
 - **Backend:** Python + FastAPI
 - **AI Service:** Python + FastAPI
 - **Frontend:** React + Tailwind CSS
 - **Database:** MySQL
 
-Tài liệu này hướng dẫn từng thành viên setup môi trường local, và cách cấu
-hình MySQL để tránh các lỗi phổ biến (mất kết nối, sai charset, lệch dữ
-liệu số tiền do kiểu dữ liệu sai).
+This document walks each team member through local setup, and explains
+how MySQL is configured to avoid common pitfalls (dropped connections,
+wrong charset, rounding errors on money values).
 
 ---
 
-## 0. Yêu cầu chung trước khi bắt đầu
+## 0. Prerequisites
 
-Cài sẵn trên máy:
-
+Install on your machine:
 - Python 3.11+
 - Node.js 20 LTS+
-- Docker Desktop (khuyến nghị dùng Docker để chạy MySQL — tránh lỗi cài đặt
-  MySQL trực tiếp trên từng máy khác nhau giữa 3 thành viên)
+- Docker Desktop (recommended for running MySQL — avoids inconsistent
+  local MySQL installs across the 3 team members)
 - Git
 
-Kiểm tra:
-
+Verify:
 ```bash
 python3 --version
 node --version
@@ -33,107 +30,105 @@ docker --version
 
 ---
 
-## 1. MySQL — cách chạy ổn định bằng Docker (khuyến nghị)
+## 1. MySQL — running it reliably with Docker (recommended)
 
-**Lý do dùng Docker thay vì cài MySQL trực tiếp:** cả 3 thành viên chạy
-đúng 1 phiên bản MySQL giống hệt nhau, tránh tình trạng "chạy được trên máy
-tui nhưng lỗi trên máy bạn" — nguyên nhân phổ biến nhất là do khác phiên
-bản MySQL hoặc khác charset mặc định.
+**Why Docker instead of installing MySQL directly:** all 3 team members
+run the exact same MySQL version, avoiding the classic "works on my
+machine" problem — usually caused by different MySQL versions or a
+different default charset.
 
-### 1.1. File `docker-compose.yml` (đặt ở thư mục gốc repo)
+### 1.1. `docker-compose.yml` (at the project root)
 
-Xem file `docker-compose.yml` đã tạo sẵn trong repo. Điểm quan trọng cần
-hiểu trong file đó:
+See the `docker-compose.yml` file already included in the repo. Key
+points to understand:
 
-- `MYSQL_CHARACTER_SET=utf8mb4` — **bắt buộc** để lưu đúng tiếng Việt có
-  dấu (VD: "Công ty ABC", "Nguyễn Văn A"). Nếu dùng charset mặc định
-  (`latin1`), dữ liệu tiếng Việt sẽ bị lỗi ký tự (hiển thị dấu `?` hoặc ký
-  tự lạ) khi lưu vào MySQL.
-- `volumes` — dữ liệu MySQL được lưu ra ngoài container, nếu container bị
-  xóa/restart thì dữ liệu vẫn còn, không mất hết mỗi lần `docker compose down`.
-- `healthcheck` — Docker tự kiểm tra MySQL đã sẵn sàng nhận kết nối chưa,
-  tránh việc backend khởi động và kết nối trước khi MySQL kịp khởi động
-  xong (lỗi rất hay gặp: "Connection refused" khi mới `docker compose up`).
+- `MYSQL_CHARACTER_SET=utf8mb4` — **required** to correctly store
+  non-ASCII text (e.g. names with special characters or accented
+  letters). The old MySQL default (`latin1`) corrupts such text into
+  `?` or garbled characters.
+- `volumes` — MySQL data is stored outside the container, so data
+  survives container restarts/removal (it's not wiped every time you
+  run `docker compose down`).
+- `healthcheck` — Docker automatically checks whether MySQL is ready to
+  accept connections, preventing the backend from starting and
+  connecting before MySQL has finished booting (a very common
+  "Connection refused" error right after `docker compose up`).
 
-### 1.2. Chạy MySQL
+### 1.2. Start MySQL
 
 ```bash
 docker compose up -d mysql
 ```
 
-Kiểm tra MySQL đã chạy:
-
+Check it's running:
 ```bash
 docker compose ps
 docker compose logs mysql
 ```
 
-### 1.3. Kết nối thử để xác nhận
+### 1.3. Test the connection
 
 ```bash
 docker exec -it ai-invoice-mysql mysql -u app_user -p ai_invoice_db
-# nhập password trong file .env
+# enter the password from your .env file
 ```
 
 ---
 
-## 2. Các nguyên tắc để MySQL luôn ổn định trong suốt quá trình làm đồ án
+## 2. Principles for keeping MySQL stable throughout the project
 
-Đây là phần quan trọng nhất — áp dụng ngay từ đầu, tránh việc giữa chừng
-đồ án phải sửa lại toàn bộ database vì lỗi cấu hình ban đầu.
+This is the most important section — apply these from day one to avoid
+having to rebuild the whole database midway through the project because
+of an initial configuration mistake.
 
-### 2.1. Luôn dùng `utf8mb4`, không dùng `utf8`
+### 2.1. Always use `utf8mb4`, never `utf8`
 
-Trong MySQL, bảng mã tên là `utf8` thực ra là bản rút gọn, **không lưu
-được đầy đủ một số ký tự**. Luôn khai báo:
-
+In MySQL, the charset literally named `utf8` is a legacy shorthand that
+**cannot store some characters correctly**. Always declare:
 ```sql
 CREATE DATABASE ai_invoice_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 ```
 
-### 2.2. Kiểu dữ liệu cho số tiền — không dùng FLOAT/DOUBLE
+### 2.2. Money columns — never use FLOAT/DOUBLE
 
-Đây là lỗi rất hay gặp ở sinh viên khi làm hệ thống kế toán: dùng `FLOAT`
-để lưu số tiền sẽ gây ra **sai số làm tròn** (VD: 2 số tiền cộng lại ra
-1999.9999999 thay vì 2000). Với hệ thống kế toán, số tiền **bắt buộc**
-dùng kiểu `DECIMAL`:
-
+A very common mistake for students building a finance system: using
+`FLOAT` to store money causes **rounding errors** (e.g. two amounts
+that should sum to 2000 end up as 1999.9999999). For an accounting
+system, money **must** use `DECIMAL`:
 ```sql
-so_tien DECIMAL(18, 2) NOT NULL
+amount DECIMAL(18, 2) NOT NULL
 ```
+`DECIMAL(18,2)` means up to 18 total digits, 2 after the decimal point
+— enough for large amounts without rounding errors.
 
-`DECIMAL(18,2)` nghĩa là tối đa 18 chữ số, 2 số sau dấu phẩy — đủ cho số
-tiền lớn mà không bị sai số.
+### 2.3. Connection pooling in the FastAPI backend
 
-### 2.3. Quản lý kết nối (connection pool) ở backend FastAPI
+If the backend opens a new connection per request without closing it
+properly, MySQL will eventually throw "Too many connections" once
+multiple people test simultaneously (including during the thesis
+defense demo if all 3 members test at once). Use SQLAlchemy with a
+pre-configured connection pool (see `backend/app/database.py`) instead
+of manually managing raw `mysql-connector` connections in each route.
 
-Nếu backend mở kết nối mới cho mỗi request mà không đóng đúng cách, MySQL
-sẽ báo lỗi "Too many connections" khi nhiều người dùng thử cùng lúc (kể cả
-lúc demo trước hội đồng nếu 3 người cùng test). Dùng SQLAlchemy với
-connection pool cấu hình sẵn (xem `backend/app/database.py` mẫu bên dưới),
-tránh tự viết kết nối MySQL thủ công bằng `mysql-connector` trực tiếp
-trong từng route.
+### 2.4. Always use migrations (Alembic), never edit the schema by hand
 
-### 2.4. Luôn dùng migration (Alembic), không sửa tay database
+When all 3 people modify table structures without migrations, each
+person's local database gradually drifts apart, causing hard-to-debug
+errors. Use **Alembic** so every schema change is recorded as a file
+and synced through Git.
 
-Khi cả 3 người cùng chỉnh sửa cấu trúc bảng, nếu không dùng migration,
-database của mỗi người sẽ dần khác nhau và gây lỗi khó debug. Dùng
-**Alembic** để mọi thay đổi cấu trúc bảng đều được ghi thành file, đồng bộ
-qua Git giữa 3 người.
+### 2.5. Back up before testing with large datasets
 
-### 2.5. Backup trước khi thử nghiệm dữ liệu lớn
-
-Trước khi test import nhiều hóa đơn mẫu, nên backup:
-
+Before importing many sample invoices for testing, back up first:
 ```bash
 docker exec ai-invoice-mysql mysqldump -u app_user -p ai_invoice_db > backup.sql
 ```
 
 ---
 
-## 3. Setup từng thành phần
+## 3. Setting up each component
 
 ### 3.1. AI Service (`ai-service/`)
 
@@ -142,9 +137,10 @@ cd ai-service
 python3 -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env           # điền API key OCR/LLM vào đây
 uvicorn app.main:app --reload --port 8001
 ```
+No local `.env` file is needed — it automatically loads the single root
+`.env` (see section 4).
 
 ### 3.2. Backend (`backend/`)
 
@@ -153,10 +149,10 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env           # điền thông tin kết nối MySQL vào đây
-alembic upgrade head            # tạo bảng theo migration mới nhất
+alembic upgrade head            # create tables from the latest migration
 uvicorn app.main:app --reload --port 8000
 ```
+Also reads the root `.env` automatically — no local `.env` file needed.
 
 ### 3.3. Frontend (`frontend/`)
 
@@ -168,86 +164,71 @@ npm run dev
 
 ---
 
-## 4. Biến môi trường (`.env`) — hướng dẫn chi tiết
+## 4. Environment variables (`.env`) — single file for the whole project
 
-### 4.1. `.env` là gì và vì sao cần
+### 4.1. What `.env` is and why there is only one
 
-File `.env` chứa các thông tin **nhạy cảm hoặc dễ thay đổi giữa các máy**
-(mật khẩu database, API key, cổng chạy...) — tách riêng khỏi code để:
+The project uses **exactly one** `.env` file, located at the project
+root. It holds every variable needed by MySQL (via docker-compose), the
+backend, and the AI service — instead of maintaining three separate
+`.env` files that can drift out of sync (which was the original,
+error-prone setup).
 
-- Không lộ mật khẩu/API key khi đẩy code lên GitHub công khai
-- Mỗi thành viên có thể dùng giá trị khác nhau (VD: API key riêng) mà
-  không ảnh hưởng code chung
+`backend/app/database.py` and `ai-service/app/main.py` both explicitly
+load this root `.env` file by resolving its path relative to their own
+location — you do not need to copy `.env` into each subfolder.
 
-File `.env.example` là **bản mẫu** (không chứa giá trị thật, an toàn để
-commit lên Git). Mỗi thành viên tự copy thành `.env` (file này đã nằm
-trong `.gitignore`, Git sẽ **không** đẩy nó lên GitHub).
+`.env.example` is the **template** (no real secrets, safe to commit to
+Git). Each team member copies it once to `.env` (already excluded via
+`.gitignore`, so Git will never push it).
 
-### 4.2. Copy file `.env` cho từng thành phần
+### 4.2. Create your `.env` file
 
 ```bash
-# Root (cho docker-compose đọc MySQL)
 cp .env.example .env
-
-# Backend
-cd backend
-cp .env.example .env
-cd ..
-
-# AI Service
-cd ai-service
-cp .env.example .env
-cd ..
 ```
+That's it — one command, run once at the project root.
 
-### 4.3. Giải thích từng biến trong `.env` (root — dùng cho MySQL)
+### 4.3. What each variable means
 
-| Biến                            | Ý nghĩa                                                                  | Có cần đổi không                                                            |
-| ------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
-| `MYSQL_ROOT_PASSWORD`           | Mật khẩu tài khoản `root` (toàn quyền) của MySQL                         | Nên đổi trước khi nộp bài/deploy thật, để mặc định khi chạy local cũng được |
-| `MYSQL_DATABASE`                | Tên database sẽ tự tạo khi MySQL khởi động lần đầu                       | Giữ nguyên `ai_invoice_db` để khớp với `backend/.env`                       |
-| `MYSQL_USER` / `MYSQL_PASSWORD` | Tài khoản riêng cho ứng dụng dùng (không dùng `root` để kết nối từ code) | Giữ nguyên khi chạy local, đổi khi deploy thật                              |
+| Variable | Used by | Meaning |
+|---|---|---|
+| `MYSQL_ROOT_PASSWORD` | docker-compose | Password for MySQL's `root` (full-access) account |
+| `MYSQL_DATABASE` | docker-compose | Database name created automatically on first MySQL startup |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | docker-compose | App-specific MySQL account (never connect using `root` from code) |
+| `DB_HOST` | backend | MySQL host — `localhost` since Docker maps the port to your machine |
+| `DB_PORT` | backend | MySQL port, default `3306` |
+| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | backend | **Must exactly match** the `MYSQL_*` values above — a mismatch causes "Access denied" errors |
+| `SECRET_KEY` | backend | Secret string used to sign JWT tokens (login). Use a long random string, especially before any real deployment |
+| `AI_SERVICE_URL` | backend | Address the backend uses to call the AI service, default `http://localhost:8001` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | ai-service | Path to the Google Cloud Vision API JSON key (leave blank if using Tesseract instead) |
+| `LLM_API_KEY` | ai-service | API key for OpenAI/Claude, used to parse invoice data. **Never commit a real key to Git** |
+| `LLM_MODEL` | ai-service | Which LLM model to call, e.g. `gpt-4o-mini` |
 
-### 4.4. Giải thích từng biến trong `backend/.env`
+### 4.4. Common `.env`-related errors
 
-| Biến                                  | Ý nghĩa                                                                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DB_HOST`                             | Địa chỉ MySQL — để `localhost` vì chạy Docker map cổng ra máy local                                                                         |
-| `DB_PORT`                             | Cổng MySQL, mặc định `3306`                                                                                                                 |
-| `DB_USER` / `DB_PASSWORD` / `DB_NAME` | **Phải khớp chính xác** với giá trị đã đặt trong `.env` ở root (mục 4.3) — sai 1 ký tự sẽ báo lỗi "Access denied" khi backend kết nối MySQL |
-| `SECRET_KEY`                          | Chuỗi bí mật để mã hóa JWT token (đăng nhập). Đổi thành chuỗi random dài, không dùng chung giữa các thành viên khi deploy thật              |
-| `AI_SERVICE_URL`                      | Địa chỉ backend gọi sang AI service, mặc định `http://localhost:8001` — chỉ đổi nếu chạy AI service ở cổng khác                             |
-
-### 4.5. Giải thích từng biến trong `ai-service/.env`
-
-| Biến                             | Ý nghĩa                                                                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Đường dẫn tới file JSON key của Google Cloud Vision API (nếu dùng OCR qua Google). Bỏ trống nếu dùng Tesseract offline thay thế |
-| `LLM_API_KEY`                    | API key của OpenAI/Claude — dùng để gọi LLM parse dữ liệu hóa đơn. **Tuyệt đối không commit key thật lên Git**                  |
-| `LLM_MODEL`                      | Tên model LLM sẽ gọi, VD `gpt-4o-mini`                                                                                          |
-
-### 4.6. Lỗi thường gặp liên quan `.env`
-
-- **Backend báo "Access denied for user"** → `DB_USER`/`DB_PASSWORD` trong
-  `backend/.env` không khớp với `.env` ở root — kiểm tra lại cho giống nhau
-- **Chạy `docker compose up` nhưng không đọc được `.env`** → phải chạy lệnh
-  ngay tại thư mục gốc repo (nơi có file `.env` và `docker-compose.yml`),
-  không chạy từ thư mục con
-- **Đổi `.env` xong nhưng MySQL không cập nhật mật khẩu mới** → MySQL chỉ
-  đọc `MYSQL_ROOT_PASSWORD`/`MYSQL_PASSWORD` ở **lần đầu tạo container**.
-  Nếu đổi sau khi đã chạy, cần `docker compose down -v` (xóa volume) rồi
-  `docker compose up -d mysql` lại để MySQL khởi tạo lại từ đầu với giá trị mới
-- **Lỡ commit `.env` thật lên GitHub** → đổi ngay mật khẩu/API key đó (coi
-  như đã lộ), sau đó xóa khỏi lịch sử Git bằng `git rm --cached .env`
-  rồi commit lại
+- **Backend reports "Access denied for user"** → `DB_USER`/`DB_PASSWORD`
+  don't match `MYSQL_USER`/`MYSQL_PASSWORD` — double-check they're identical
+- **`docker compose up` doesn't seem to read `.env`** → you must run the
+  command from the project root (where both `.env` and
+  `docker-compose.yml` live), not from a subfolder
+- **Changed `.env` but MySQL still uses the old password** → MySQL only
+  reads `MYSQL_ROOT_PASSWORD`/`MYSQL_PASSWORD` the **first time** the
+  container is created. If you change them afterward, run
+  `docker compose down -v` (this wipes the volume) then
+  `docker compose up -d mysql` again so MySQL re-initializes with the
+  new values
+- **Accidentally committed a real `.env` to GitHub** → rotate that
+  password/API key immediately (treat it as compromised), then remove it
+  from Git history with `git rm --cached .env` and commit again
 
 ---
 
-## 5. Thứ tự chạy khi bắt đầu 1 buổi code
+## 5. Daily startup order
 
 ```bash
-docker compose up -d mysql       # 1. bật database trước
-cd backend && uvicorn app.main:app --reload --port 8000 &   # 2. bật backend
-cd ai-service && uvicorn app.main:app --reload --port 8001 & # 3. bật AI service
-cd frontend && npm run dev       # 4. bật frontend cuối cùng
+docker compose up -d mysql       # 1. start the database first
+cd backend && uvicorn app.main:app --reload --port 8000 &   # 2. start backend
+cd ai-service && uvicorn app.main:app --reload --port 8001 & # 3. start AI service
+cd frontend && npm run dev       # 4. start frontend last
 ```

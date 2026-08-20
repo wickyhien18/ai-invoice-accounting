@@ -1,19 +1,19 @@
 # Database
 
-Chứa schema, migration và seed data.
+Contains schema, migrations, and seed data.
 
-## Seed data quan trọng: Chart of Accounts (Danh mục tài khoản)
+## Important seed data: Chart of Accounts
 
-Cần seed sẵn danh mục tài khoản theo Phụ lục 1, Thông tư 133/2016/TT-BTC
-(hoặc TT200/2014/TT-BTC nếu nhóm chọn áp dụng cho doanh nghiệp lớn hơn).
+Seed the account list per Appendix 1, Circular 133/2016/TT-BTC (or
+200/2014/TT-BTC if the team targets larger enterprises instead).
 
-Nguồn tài khoản chuẩn:
+Reference source:
 - https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Thong-tu-133-2016-TT-BTC-huong-dan-che-do-ke-toan-doanh-nghiep-nho-va-vua-284997.aspx
 
-## File dự kiến
+## Planned files
 ```
 database/
-├── schema.sql              # DDL các bảng chính
-├── seed_chart_of_accounts.sql   # Danh mục tài khoản mẫu (111, 112, 331, 642, 156...)
-└── er-diagram.png          # Sơ đồ ERD (xuất từ Chương 3 đồ án)
+├── schema.sql                    # DDL for the main tables
+├── seed_chart_of_accounts.sql    # Sample account list (111, 112, 331, 642, 156...)
+└── er-diagram.png                # ERD (exported from Chapter 3 of the report)
 ```

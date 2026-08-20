@@ -1,19 +1,22 @@
 # Backend
 
-Chịu trách nhiệm:
-- API chính cho frontend
-- Database (hóa đơn, chứng từ, chart of accounts, bút toán, người dùng)
-- Business logic: đối chiếu chứng từ, gán bút toán, workflow duyệt
-- Xác thực & phân quyền (JWT)
-- Gọi sang `ai-service` để lấy kết quả OCR + trích xuất
+Responsible for:
+- Main API for the frontend
+- Database (invoices, documents, chart of accounts, journal entries, users)
+- Business logic: document matching, GL coding, approval workflow
+- Authentication & authorization (JWT)
+- Calling `ai-service` to get OCR + extraction results
 
-## Công nghệ
-Python + FastAPI, SQLAlchemy (ORM), Alembic (migration), MySQL, JWT (auth)
+## Tech Stack
+Python + FastAPI, SQLAlchemy (ORM), Alembic (migrations), MySQL, JWT (auth)
 
-## Các bảng chính cần thiết kế
-- `users` — kế toán viên / kế toán trưởng
-- `invoices` — hóa đơn gốc, trạng thái xử lý
-- `invoice_fields` — dữ liệu trích xuất kèm confidence_score
-- `chart_of_accounts` — danh mục tài khoản theo Phụ lục 1, TT133/2016/TT-BTC
-- `journal_entries` — bút toán (Nợ/Có)
-- `matching_results` — kết quả đối chiếu PO – GRN – Invoice
+## Environment variables
+No local `.env` file — reads the single root `.env` (see `../SETUP.md`).
+
+## Main tables to design
+- `users` — accountant / chief accountant
+- `invoices` — source invoice, processing status
+- `invoice_fields` — extracted data with confidence_score
+- `chart_of_accounts` — account list per Appendix 1, Circular 133/2016/TT-BTC
+- `journal_entries` — journal entries (Debit/Credit)
+- `matching_results` — PO – GRN – Invoice matching results

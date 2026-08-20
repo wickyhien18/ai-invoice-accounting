@@ -1,11 +1,11 @@
 # Frontend
 
-Chịu trách nhiệm:
-- Giao diện upload/chụp ảnh hóa đơn
-- Màn hình xác nhận/sửa dữ liệu trích xuất (hiển thị confidence score)
-- Màn hình xác nhận bút toán đề xuất (Nợ/Có)
-- Workflow duyệt (kế toán viên → kế toán trưởng)
-- Dashboard báo cáo (Chart.js/ECharts)
+Responsible for:
+- Invoice upload/photo capture UI
+- Screen to confirm/edit extracted data (showing confidence scores)
+- Screen to confirm suggested journal entries (Debit/Credit)
+- Approval workflow (accountant → chief accountant)
+- Reporting dashboard (Chart.js/Recharts)
 
-## Công nghệ
+## Tech Stack
 React + Vite + Tailwind CSS, react-router-dom, axios, Chart.js/Recharts (dashboard)

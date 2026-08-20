@@ -1,26 +1,29 @@
 # AI Service
 
-Chịu trách nhiệm 3 nghiệp vụ cốt lõi:
-- OCR: đọc ảnh/PDF hóa đơn thành văn bản thô
-- Trích xuất dữ liệu: parse văn bản thô thành JSON có cấu trúc (nhà cung cấp, ngày,
-  số tiền, MST...) qua LLM API
-- Confidence score: trả về độ tin cậy cho từng trường dữ liệu
+Responsible for 3 core functions:
+- OCR: read invoice images/PDFs into raw text
+- Extraction: parse raw text into structured JSON (vendor, date, amount,
+  tax ID...) via an LLM API
+- Confidence scoring: return a confidence score for each extracted field
 
-## Công nghệ dự kiến
+## Tech Stack
 - Python 3.11+
-- FastAPI — expose REST API cho backend gọi vào
-- Google Cloud Vision API hoặc Tesseract OCR (offline fallback)
-- LLM API (OpenAI/Claude) để parse text → JSON
-- Pydantic — validate schema đầu ra
+- FastAPI — exposes a REST API for the backend to call
+- Google Cloud Vision API or Tesseract OCR (offline fallback)
+- LLM API (OpenAI/Claude) to parse text → JSON
+- Pydantic — validates the output schema
 
-## Cấu trúc dự kiến
+## Environment variables
+No local `.env` file — reads the single root `.env` (see `../SETUP.md`).
+
+## Structure
 
 ```
 ai-service/
 ├── app/
 │   ├── main.py           # FastAPI entrypoint
-│   ├── ocr/               # module gọi OCR
-│   ├── extraction/        # module gọi LLM parse dữ liệu
+│   ├── ocr/               # OCR-calling module
+│   ├── extraction/        # LLM data-extraction module
 │   └── schemas/           # Pydantic models
-├── requirements.txt
-└── .env.example
+└── requirements.txt
+```

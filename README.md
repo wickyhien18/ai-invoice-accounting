@@ -1,104 +1,110 @@
 # AI Invoice Accounting
 
-Hệ thống hỗ trợ nhập liệu hóa đơn/chứng từ kế toán bằng AI — đồ án tốt nghiệp.
+AI-assisted invoice/document entry system for accounting — graduation project.
 
-## Mục tiêu
+## Goal
 
-Tự động hóa việc đọc, trích xuất, đối chiếu và gán bút toán (ghi sổ kế toán)
-cho hóa đơn, giảm thời gian nhập liệu thủ công và sai sót cho kế toán viên.
+Automate reading, extracting, matching, and posting journal entries for
+invoices, reducing manual data entry time and errors for accountants.
 
-## 7 chức năng cốt lõi
+## 7 Core Functions
 
-1. Thu nhận & số hóa hóa đơn (OCR)
-2. Trích xuất dữ liệu có cấu trúc (nhà cung cấp, ngày, số tiền, MST...)
-3. Chuẩn hóa ngữ cảnh (NLP) — hiểu các cách viết khác nhau giữa nhà cung cấp
-4. Đánh giá độ tin cậy dữ liệu trích xuất (confidence score)
-5. Đối chiếu chứng từ (2-way/3-way matching)
-6. Gán bút toán (GL Coding) — đề xuất Nợ/Có theo TT133/2016/TT-BTC
-7. Báo cáo & phân tích xu hướng chi tiêu
+1. Invoice capture & digitization (OCR)
+2. Structured data extraction (vendor, date, amount, tax ID...)
+3. Context normalization (NLP) — understand different phrasing across vendors
+4. Confidence scoring for extracted data
+5. Document matching (2-way/3-way matching)
+6. GL Coding — suggest Debit/Credit entries following Circular 133/2016/TT-BTC
+7. Reporting & spending trend analysis
 
-## Cấu trúc thư mục
+## Folder Structure
 
 ```
 ai-invoice-accounting/
-├── ai-service/     # Service Python xử lý OCR + LLM parse dữ liệu
-├── backend/        # API chính: business logic, database, workflow duyệt
-├── frontend/       # Giao diện web: upload, xác nhận, dashboard
-├── database/        # Schema, migration, seed data (Chart of Accounts theo TT133)
-└── docs/            # Tài liệu đồ án theo từng chương
+├── ai-service/     # Python service for OCR + LLM data extraction
+├── backend/        # Main API: business logic, database, approval workflow
+├── frontend/       # Web UI: upload, confirmation, dashboard
+├── database/       # Schema, migrations, seed data (Chart of Accounts per TT133)
+└── docs/           # Project report, organized by chapter
 ```
 
-## Công nghệ
+## Tech Stack
 
-| Thành phần | Công nghệ                                                      |
+| Component  | Technology                                                     |
 | ---------- | -------------------------------------------------------------- |
 | AI Service | Python + FastAPI, Google Cloud Vision API / Tesseract, LLM API |
 | Backend    | Python + FastAPI, SQLAlchemy, Alembic                          |
 | Frontend   | React + Vite + Tailwind CSS                                    |
-| Database   | MySQL 8.0 (chạy qua Docker)                                    |
+| Database   | MySQL 8.0 (via Docker)                                         |
 
-Xem hướng dẫn cài đặt chi tiết tại [`SETUP.md`](./SETUP.md) — đặc biệt lưu ý
-phần cấu hình MySQL để tránh lỗi charset/kết nối khi cả nhóm cùng làm việc.
+See [`SETUP.md`](./SETUP.md) for detailed setup instructions — especially
+the MySQL configuration section, to avoid charset/connection issues when
+the team works together.
 
-## Hướng dẫn Setup
+## Setup Guide
 
-### Bước 0: Cài Docker (nếu máy chưa có)
+### Step 0: Install Docker (if not already installed)
 
-Dự án dùng Docker để chạy MySQL — đảm bảo cả 3 thành viên chạy cùng 1 phiên
-bản MySQL giống hệt nhau, tránh lỗi lệch cấu hình giữa các máy.
+The project uses Docker to run MySQL — this ensures all 3 team members run
+the exact same MySQL version, avoiding config mismatches between machines.
 
-- **Windows/Mac:** tải Docker Desktop tại https://www.docker.com/products/docker-desktop
-  → cài như phần mềm bình thường → mở lên, đợi biểu tượng cá voi hết trạng
-  thái loading (nghĩa là Docker đã sẵn sàng)
-- **Linux:** cài Docker Engine theo hướng dẫn tại
+- **Windows/Mac:** download Docker Desktop at
+  https://www.docker.com/products/docker-desktop → install like any normal
+  app → open it and wait until the whale icon stops loading (Docker is ready)
+- **Linux:** install Docker Engine following
   https://docs.docker.com/engine/install/
 
-Kiểm tra đã cài thành công:
+Verify installation:
 
 ```bash
 docker --version
 docker compose version
 ```
 
-### Bước 1: Tạo file `.env` và chạy MySQL
+### Step 1: Create the single `.env` file and start MySQL
+
+There is exactly **one** `.env` file for the whole project, at the root.
+Docker Compose, the backend, and the AI service all read from it.
 
 ```bash
-cp .env.example .env    # điền/giữ giá trị mặc định cho MySQL
+cp .env.example .env    # fill in real values, or keep the defaults for local dev
 docker compose up -d mysql
 ```
 
-Lần đầu chạy sẽ mất vài phút để tải image MySQL 8.0.
+The first run takes a few minutes to pull the MySQL 8.0 image.
 
-Kiểm tra MySQL đã sẵn sàng:
+Check MySQL is ready:
 
 ```bash
-docker compose ps        # trạng thái phải là "healthy"
+docker compose ps        # status should be "healthy"
 docker compose logs mysql
 ```
 
-### Bước 2: Chạy AI Service
+### Step 2: Run the AI Service
 
 ```bash
 cd ai-service
 python3 -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env           # điền API key OCR/LLM
 uvicorn app.main:app --reload --port 8001
 ```
 
-### Bước 3: Chạy Backend
+(No separate `.env` needed here — it reads the root `.env` automatically.)
+
+### Step 3: Run the Backend
 
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env           # điền thông tin kết nối MySQL
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Bước 4: Chạy Frontend
+(Also reads the root `.env` automatically — no local `.env` file needed.)
+
+### Step 4: Run the Frontend
 
 ```bash
 cd frontend
@@ -106,12 +112,12 @@ npm install
 npm run dev
 ```
 
-### Thứ tự chạy mỗi khi bắt đầu code
+### Daily startup order
 
 ```bash
 docker compose up -d mysql
-# sau đó mở 3 terminal riêng cho backend, ai-service, frontend
+# then open 3 separate terminals for backend, ai-service, frontend
 ```
 
-Xem thêm chi tiết nguyên tắc giữ MySQL ổn định (charset, kiểu dữ liệu tiền,
-connection pool, migration) tại [`SETUP.md`](./SETUP.md).
+See [`SETUP.md`](./SETUP.md) for the full list of MySQL stability
+practices (charset, money data type, connection pooling, migrations).

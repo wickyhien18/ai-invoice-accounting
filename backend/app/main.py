@@ -5,7 +5,7 @@ app = FastAPI(title="AI Invoice Accounting - Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # địa chỉ dev server của React (Vite)
+    allow_origins=["http://localhost:5173"],  # React (Vite) dev server address
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
