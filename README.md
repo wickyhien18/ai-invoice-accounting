@@ -166,13 +166,80 @@ echo "Docker: $(docker --version 2>/dev/null || echo 'NOT INSTALLED')"
 
 **If you don't want to use MySQL in terminal then install MySQL Workbench**
 
-Install:
+_Windows_
 
-- Windows/Mac: download at https://dev.mysql.com/downloads/workbench/ → run the installer → keep default options
-- Linux (Ubuntu/Debian): Software Center → search "MySQL Workbench" → Install
-- Linux (Arch/CachyOS): Software Center (Discover/Pamac) → search "mysql-workbench" → Install
+Step 1: Download
 
-Connect to your Docker MySQL
+- Go to https://dev.mysql.com/downloads/workbench/
+- Under "Select Operating System," make sure Microsoft Windows is selected
+- Click Download next to the .msi installer (usually the top option, ~200MB)
+- On the next page, it may ask you to log in or create an Oracle account — look for a small link at the bottom that says "No thanks, just start my download" — click that to skip account creation
+
+Step 2: Install
+
+- Run the downloaded .msi file
+- Click Next through the setup wizard, keeping default settings
+- If it asks about installing Visual C++ Redistributable, click Yes — MySQL Workbench needs this to run
+- Click Install, then Finish
+
+Step 3: Launch
+
+Find "MySQL Workbench" in your Start Menu and open it
+
+_Mac_
+
+Step 1: Download
+
+- Go to https://dev.mysql.com/downloads/workbench/
+- Under "Select Operating System," choose macOS
+- Choose the correct version for your chip:
+  - Apple Silicon (M1/M2/M3/M4): select the ARM, 64-bit DMG
+  - Intel Mac: select the x86, 64-bit DMG
+- Click Download, then "No thanks, just start my download" at the bottom to skip login
+
+Step 2: Install
+
+- Open the downloaded .dmg file
+- Drag the MySQL Workbench icon into the Applications folder shortcut shown in the window
+- Close the installer window
+
+Step 3: Launch (first time only — macOS security step)
+
+- Open Applications → double-click MySQL Workbench
+  macOS will likely block it with a warning ("cannot be opened because the developer cannot be verified")
+- Go to System Settings → Privacy & Security, scroll down, and click "Open Anyway" next to the MySQL Workbench message
+- Confirm by clicking Open in the popup
+
+_Linux — Ubuntu / Debian_
+
+Option A: Software Center (easiest)
+
+- Open Ubuntu Software (or "GNOME Software")
+- Search for "MySQL Workbench"
+- Click Install
+
+Option B: Terminal (if Option A doesn't find it)
+
+```bash
+sudo apt update
+sudo apt install mysql-workbench
+```
+
+_Linux — Arch / CachyOS_
+
+Option A: Pacman (official repos)
+
+```bash
+sudo pacman -S mysql-workbench
+```
+
+Option B: If not found via pacman, use an AUR helper
+
+```bash
+yay -S mysql-workbench
+```
+
+**Connect to your Docker MySQL**
 
 Since your MySQL is running inside Docker (from _docker compose up -d mysql_), it's still reachable at _localhost:3306_ — Workbench connects to it exactly like a normal MySQL server.
 
