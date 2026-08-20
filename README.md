@@ -43,7 +43,7 @@ the team works together.
 
 ## Setup Guide
 
-### Step 0: Install Docker (if not already installed)
+### Step 0: Install Python, NodeJS, Docker (if not already installed)
 
 The project uses Docker to run MySQL — this ensures all 3 team members run
 the exact same MySQL version, avoiding config mismatches between machines.
@@ -59,6 +59,109 @@ Verify installation:
 ```bash
 docker --version
 docker compose version
+```
+
+Install Python 3.12 specifically.
+
+Windows
+
+- Go to https://www.python.org/downloads/release/python-3120/
+- Scroll down, download "Windows installer (64-bit)"
+  -Run the installer — check the box "Add python.exe to PATH" before clicking Install (easy to miss, but important)
+- Verify:
+
+```bash
+python --version
+```
+
+Macs
+
+```bash
+brew install python@3.12
+```
+
+(If you don't have Homebrew: install it first from https://brew.sh)
+
+Verify:
+
+```bash
+python3.12 --version
+```
+
+Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install python3.12 python3.12-venv
+```
+
+Linux (Arch/CachyOS — matches your earlier error)
+
+```bash
+sudo pacman -S python312
+```
+
+If not available in official repos:
+
+```bash
+yay -S python312
+```
+
+Check if Python is already installed (any OS)
+
+```bash
+python3 --version
+python3.12 --version
+```
+
+Node.js (version 20 LTS)
+
+Windows / Mac
+
+- Go to https://nodejs.org
+- Download the button labeled "LTS" (currently 20.x or 22.x — either LTS version works fine for this project)
+- Run the installer, keep default options, click through to finish
+- Verify:
+
+```bash
+node --version
+npm --version
+```
+
+Mac (via Homebrew, alternative)
+
+```bash
+brew install node@20
+```
+
+Linux (Ubuntu/Debian) — using NodeSource (recommended over apt's outdated version)
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+```
+
+Linux (Arch/CachyOS)
+
+```bash
+sudo pacman -S nodejs npm
+```
+
+Check if Node.js is already installed (any OS)
+
+```bash
+node --version
+npm --version
+```
+
+If you see version numbers (e.g. v20.x.x), it's installed. If command not found, it isn't.
+
+**Quick summary — one command to check everything at once**
+
+```bash
+echo "Python: $(python3.12 --version 2>/dev/null || echo 'NOT INSTALLED')"
+echo "Node:   $(node --version 2>/dev/null || echo 'NOT INSTALLED')"
+echo "Docker: $(docker --version 2>/dev/null || echo 'NOT INSTALLED')"
 ```
 
 ### Step 1: Create the single `.env` file and start MySQL
