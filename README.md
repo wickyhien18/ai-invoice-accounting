@@ -174,17 +174,19 @@ Install:
 
 Connect to your Docker MySQL
 
-Since your MySQL is running inside Docker (from $\color{orage}{\text{docker compose up -d mysql}}$), it's still reachable at localhost:3306 — Workbench connects to it exactly like a normal MySQL server.
+Since your MySQL is running inside Docker (from _docker compose up -d mysql_), it's still reachable at _localhost:3306_ — Workbench connects to it exactly like a normal MySQL server.
 
-Open MySQL Workbench
-Click the "+" next to "MySQL Connections"
-Fill in:
-Connection Name: AI Invoice Accounting
-Hostname: 127.0.0.1
-Port: 3306
-Username: app_user (or whatever you set as MYSQL_USER in your .env)
-Click "Test Connection" → it will ask for the password → enter app_password (or your MYSQL_PASSWORD value) → check "Save password"
-Click OK, then double-click the new connection to open it
+1. Open MySQL Workbench
+2. Click the "+" next to "MySQL Connections"
+3. Fill in:
+
+- Connection Name: AI Invoice Accounting
+- Hostname: 127.0.0.1
+- Port: 3306
+- Username: app_user (or whatever you set as MYSQL_USER in your .env)
+
+4. Click "Test Connection" → it will ask for the password → enter **app_password** (or your **MYSQL_PASSWORD** value) → check "Save password"
+5. Click OK, then double-click the new connection to open it
 
 You'll now see all databases, including ai_invoice_db, with a full table browser, SQL editor, and ER diagram tool — no terminal needed from here on.
 
