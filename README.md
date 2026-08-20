@@ -61,9 +61,9 @@ docker --version
 docker compose version
 ```
 
-Install Python 3.12 specifically.
+**Install Python 3.12 specifically.**
 
-Windows
+_Windows_
 
 - Go to https://www.python.org/downloads/release/python-3120/
 - Scroll down, download "Windows installer (64-bit)"
@@ -74,7 +74,7 @@ Windows
 python --version
 ```
 
-Macs
+_Macs_
 
 ```bash
 brew install python@3.12
@@ -88,14 +88,14 @@ Verify:
 python3.12 --version
 ```
 
-Linux (Ubuntu/Debian)
+_Linux (Ubuntu/Debian)_
 
 ```bash
 sudo apt update
 sudo apt install python3.12 python3.12-venv
 ```
 
-Linux (Arch/CachyOS — matches your earlier error)
+_Linux (Arch/CachyOS — matches your earlier error)_
 
 ```bash
 sudo pacman -S python312
@@ -114,9 +114,9 @@ python3 --version
 python3.12 --version
 ```
 
-Node.js (version 20 LTS)
+**Node.js (version 20 LTS)**
 
-Windows / Mac
+_Windows / Mac_
 
 - Go to https://nodejs.org
 - Download the button labeled "LTS" (currently 20.x or 22.x — either LTS version works fine for this project)
@@ -128,20 +128,20 @@ node --version
 npm --version
 ```
 
-Mac (via Homebrew, alternative)
+_Mac (via Homebrew, alternative)_
 
 ```bash
 brew install node@20
 ```
 
-Linux (Ubuntu/Debian) — using NodeSource (recommended over apt's outdated version)
+_Linux (Ubuntu/Debian) — using NodeSource (recommended over apt's outdated version)_
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 ```
 
-Linux (Arch/CachyOS)
+_Linux (Arch/CachyOS)_
 
 ```bash
 sudo pacman -S nodejs npm
