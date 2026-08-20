@@ -1,6 +1,6 @@
 # AI Invoice Accounting
 
-AI-assisted invoice/document entry system for accounting — graduation project.
+AI-assisted invoice/document entry system for accounting
 
 ## Goal
 
