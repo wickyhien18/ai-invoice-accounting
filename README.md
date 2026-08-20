@@ -193,8 +193,6 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
-(No separate `.env` needed here — it reads the root `.env` automatically.)
-
 ### Step 3: Run the Backend
 
 ```bash
@@ -204,8 +202,6 @@ source venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
-
-(Also reads the root `.env` automatically — no local `.env` file needed.)
 
 ### Step 4: Run the Frontend
 
