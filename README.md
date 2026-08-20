@@ -164,6 +164,30 @@ echo "Node:   $(node --version 2>/dev/null || echo 'NOT INSTALLED')"
 echo "Docker: $(docker --version 2>/dev/null || echo 'NOT INSTALLED')"
 ```
 
+**If you don't want to use MySQL in terminal then install MySQL Workbench**
+
+Install:
+
+- Windows/Mac: download at https://dev.mysql.com/downloads/workbench/ → run the installer → keep default options
+- Linux (Ubuntu/Debian): Software Center → search "MySQL Workbench" → Install
+- Linux (Arch/CachyOS): Software Center (Discover/Pamac) → search "mysql-workbench" → Install
+
+Connect to your Docker MySQL
+
+Since your MySQL is running inside Docker (from $\color{orage}{\text{docker compose up -d mysql}}$), it's still reachable at localhost:3306 — Workbench connects to it exactly like a normal MySQL server.
+
+Open MySQL Workbench
+Click the "+" next to "MySQL Connections"
+Fill in:
+Connection Name: AI Invoice Accounting
+Hostname: 127.0.0.1
+Port: 3306
+Username: app_user (or whatever you set as MYSQL_USER in your .env)
+Click "Test Connection" → it will ask for the password → enter app_password (or your MYSQL_PASSWORD value) → check "Save password"
+Click OK, then double-click the new connection to open it
+
+You'll now see all databases, including ai_invoice_db, with a full table browser, SQL editor, and ER diagram tool — no terminal needed from here on.
+
 ### Step 1: Create the single `.env` file and start MySQL
 
 There is exactly **one** `.env` file for the whole project, at the root.
