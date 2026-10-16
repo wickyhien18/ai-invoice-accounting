@@ -266,6 +266,17 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
+Before testing, check you are in the AI Service venv (the backend has its own
+`venv` folder too, and the `(venv)` prompt looks identical):
+
+```bash
+which python                       # must end with ai-service/venv/bin/python
+python -m pip show paddleocr       # must print a Version line
+```
+
+If either check fails, see the Troubleshooting section of
+[`SETUP.md`](./SETUP.md) (`No module named 'paddle'` / `'paddleocr'`).
+
 The first run downloads the OCR models, so it needs internet and takes
 longer. For the machine-learning packages (scikit-learn, sentence-transformers)
 and the full AI Service notes, see [`SETUP.md`](./SETUP.md) section 3.1.
