@@ -1,4 +1,5 @@
 fastapi
+paddleocr
 uvicorn[standard]
 python-dotenv
 python-multipart
