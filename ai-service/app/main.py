@@ -1,23 +1,16 @@
-import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
-# Root .env is two levels up from this file: ai-service/app/main.py -> project root
-ROOT_ENV_PATH = Path(__file__).resolve().parent.parent.parent / ".env"
-load_dotenv(dotenv_path=ROOT_ENV_PATH)
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")  # .env DUY NHAT o thu muc goc
 
-LLM_API_KEY = os.getenv("LLM_API_KEY")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
-GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+from app.routers import mock_contract  # noqa: E402
 
 app = FastAPI(title="AI Invoice Accounting - AI Service")
+app.include_router(mock_contract.router)
 
 
 @app.get("/health")
-def health_check():
+def health():
     return {"status": "ok"}
-
-
-# TODO: /ocr endpoint — receive an invoice image, return raw text
-# TODO: /extract endpoint — receive raw text, return structured JSON + confidence score

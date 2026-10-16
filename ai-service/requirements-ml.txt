@@ -1,0 +1,3 @@
+# Goi ML (nang): cai khi lam Goi B/C
+scikit-learn
+sentence-transformers

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DU LIEU GIA, cau truc mo phong don gian hoa, chua kiem tra voi XSD chinh thuc -->
+<HDon><DLHDon><TTChung><PBan>2.0.0</PBan><THDon>Hóa đơn giá trị gia tăng</THDon><KHMSHDon>1</KHMSHDon><KHHDon>C26MBF</KHHDon><SHDon>291609</SHDon><NLap>2026-06-23</NLap><DVTTe>VND</DVTTe><HTTToan>Chuyển khoản</HTTToan></TTChung>
+<NDHDon><NBan><Ten>Công ty CP Vận tải Mẫu Thử Dũng</Ten><MST>0487211601</MST><DChi>Số 240 đường Lê Lợi, Đà Nẵng</DChi></NBan>
+<NMua><Ten>Công ty TNHH Khách Hàng Mẫu Thử</Ten><MST>0109999990</MST><DChi>Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Giấy in A4 Double A 70gsm</THHDVu><DVTinh>Ream</DVTinh><SLuong>5</SLuong><DGia>84800</DGia><ThTien>424000</ThTien><TSuat>8%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><THHDVu>Ghế xoay văn phòng</THHDVu><DVTinh>Cái</DVTinh><SLuong>3</SLuong><DGia>1152700</DGia><ThTien>3458100</ThTien><TSuat>8%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>3882100</TgTCThue><TgTThue>310568</TgTThue><TgTTTBSo>4192668</TgTTTBSo><TgTTTBChu>Bốn triệu một trăm chín mươi hai nghìn sáu trăm sáu mươi tám đồng</TgTTTBChu></TToan></NDHDon></DLHDon><MCCQT>MẪU-THỬ-EB8C8B76BA79</MCCQT></HDon>

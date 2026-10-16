@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DU LIEU GIA, cau truc mo phong don gian hoa, chua kiem tra voi XSD chinh thuc -->
+<HDon><DLHDon><TTChung><PBan>2.0.0</PBan><THDon>Hóa đơn giá trị gia tăng</THDon><KHMSHDon>1</KHMSHDon><KHHDon>K26TNE</KHHDon><SHDon>9164215</SHDon><NLap>2026-05-14</NLap><DVTTe>VND</DVTTe><HTTToan>Chuyển khoản</HTTToan></TTChung>
+<NDHDon><NBan><Ten>Công ty TNHH Nội thất Mẫu Thử Tâm</Ten><MST>0269451428</MST><DChi>Số 7 đường Giải Phóng, Đà Nẵng</DChi></NBan>
+<NMua><Ten>Công ty TNHH Khách Hàng Mẫu Thử</Ten><MST>0109999990</MST><DChi>Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Nước uống đóng bình 20L</THHDVu><DVTinh>Bình</DVTinh><SLuong>3</SLuong><DGia>54100</DGia><ThTien>162300</ThTien><TSuat>0%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><THHDVu>Chuột không dây Logitech M331</THHDVu><DVTinh>Cái</DVTinh><SLuong>1</SLuong><DGia>271200</DGia><ThTien>271200</ThTien><TSuat>0%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>433500</TgTCThue><TgTThue>0</TgTThue><TgTTTBSo>433500</TgTTTBSo><TgTTTBChu>Bốn trăm ba mươi ba nghìn năm trăm đồng</TgTTTBChu></TToan></NDHDon></DLHDon></HDon>

@@ -1,0 +1,583 @@
+[
+  {
+    "id": "HD001",
+    "mau_so": "1",
+    "ky_hieu": "C26MBF",
+    "ma_co_quan_thue": "MẪU-THỬ-EB8C8B76BA79",
+    "ma_tra_cuu": "4Q749F7Z",
+    "stk_nguoi_ban": "795761703282",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "0291609",
+    "ngay_lap": "23/06/2026",
+    "ten_nguoi_ban": "Công ty CP Vận tải Mẫu Thử Dũng",
+    "mst_nguoi_ban": "0487211601",
+    "dia_chi_nguoi_ban": "Số 240 đường Lê Lợi, Đà Nẵng",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Giấy in A4 Double A 70gsm",
+        "dvt": "Ream",
+        "so_luong": 5,
+        "don_gia": 84800,
+        "thanh_tien": 424000
+      },
+      {
+        "ten_hang": "Ghế xoay văn phòng",
+        "dvt": "Cái",
+        "so_luong": 3,
+        "don_gia": 1152700,
+        "thanh_tien": 3458100
+      }
+    ],
+    "tong_truoc_thue": 3882100,
+    "thue_suat": 8,
+    "tien_thue": 310568,
+    "tong_thanh_toan": 4192668,
+    "bang_chu": "Bốn triệu một trăm chín mươi hai nghìn sáu trăm sáu mươi tám đồng",
+    "mau_trinh_bay": "P",
+    "anh": "images/HD001.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD002",
+    "mau_so": "1",
+    "ky_hieu": "K26TPA",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "9CD8F7Q6",
+    "stk_nguoi_ban": "419005665094",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "9990068",
+    "ngay_lap": "04/09/2026",
+    "ten_nguoi_ban": "Công ty CP Dịch vụ Mẫu Thử Bình",
+    "mst_nguoi_ban": "0748066059",
+    "dia_chi_nguoi_ban": "Số 199 đường Lê Lợi, Hà Nội",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "TM/CK",
+    "dong_hang": [
+      {
+        "ten_hang": "Tiền thuê phòng họp",
+        "dvt": "Giờ",
+        "so_luong": 1,
+        "don_gia": 171700,
+        "thanh_tien": 171700
+      },
+      {
+        "ten_hang": "Bút bi Thiên Long TL-027",
+        "dvt": "Cái",
+        "so_luong": 15,
+        "don_gia": 3200,
+        "thanh_tien": 48000
+      },
+      {
+        "ten_hang": "Cước internet cáp quang tháng",
+        "dvt": "Tháng",
+        "so_luong": 3,
+        "don_gia": 416100,
+        "thanh_tien": 1248300
+      }
+    ],
+    "tong_truoc_thue": 1468000,
+    "thue_suat": 5,
+    "tien_thue": 73400,
+    "tong_thanh_toan": 1541400,
+    "bang_chu": "Một triệu năm trăm bốn mươi mốt nghìn bốn trăm đồng",
+    "mau_trinh_bay": "C",
+    "anh": "images/HD002.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD003",
+    "mau_so": "1",
+    "ky_hieu": "C26TMD",
+    "ma_co_quan_thue": "MẪU-THỬ-34E56ABC73E5",
+    "ma_tra_cuu": "X74BTXJT",
+    "stk_nguoi_ban": "520793114317",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "8981012",
+    "ngay_lap": "03/01/2026",
+    "ten_nguoi_ban": "Công ty TNHH Thiết bị IT Mẫu Thử Quang",
+    "mst_nguoi_ban": "0235290563",
+    "dia_chi_nguoi_ban": "Số 215 đường Trần Phú, Đà Nẵng",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Tiền mặt",
+    "dong_hang": [
+      {
+        "ten_hang": "Chuột không dây Logitech M331",
+        "dvt": "Cái",
+        "so_luong": 5,
+        "don_gia": 306900,
+        "thanh_tien": 1534500
+      },
+      {
+        "ten_hang": "Dịch vụ in ấn tài liệu",
+        "dvt": "Trang",
+        "so_luong": 19,
+        "don_gia": 748,
+        "thanh_tien": 14212
+      },
+      {
+        "ten_hang": "Tiền thuê phòng họp",
+        "dvt": "Giờ",
+        "so_luong": 4,
+        "don_gia": 563200,
+        "thanh_tien": 2252800
+      }
+    ],
+    "tong_truoc_thue": 3801512,
+    "thue_suat": 0,
+    "tien_thue": 0,
+    "tong_thanh_toan": 3801512,
+    "bang_chu": "Ba triệu tám trăm lẻ một nghìn năm trăm mười hai đồng",
+    "mau_trinh_bay": "B",
+    "anh": "images/HD003.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD004",
+    "mau_so": "1",
+    "ky_hieu": "C26MAX",
+    "ma_co_quan_thue": "MẪU-THỬ-2675C3CAAE85",
+    "ma_tra_cuu": "T4HVQTLS",
+    "stk_nguoi_ban": "427832781336",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "7187312",
+    "ngay_lap": "28/08/2026",
+    "ten_nguoi_ban": "Công ty TNHH Văn phòng phẩm Mẫu Thử Cường",
+    "mst_nguoi_ban": "0394676735",
+    "dia_chi_nguoi_ban": "Số 196 đường Láng Hạ, Đà Nẵng",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Dịch vụ in ấn tài liệu",
+        "dvt": "Trang",
+        "so_luong": 20,
+        "don_gia": 1036,
+        "thanh_tien": 20720
+      },
+      {
+        "ten_hang": "Ghế xoay văn phòng",
+        "dvt": "Cái",
+        "so_luong": 4,
+        "don_gia": 1603000,
+        "thanh_tien": 6412000
+      },
+      {
+        "ten_hang": "Giấy in A4 Double A 70gsm",
+        "dvt": "Ream",
+        "so_luong": 15,
+        "don_gia": 75300,
+        "thanh_tien": 1129500
+      },
+      {
+        "ten_hang": "Chuột không dây Logitech M331",
+        "dvt": "Cái",
+        "so_luong": 5,
+        "don_gia": 212700,
+        "thanh_tien": 1063500
+      },
+      {
+        "ten_hang": "Máy tính xách tay Dell Vostro",
+        "dvt": "Chiếc",
+        "so_luong": 2,
+        "don_gia": 16626100,
+        "thanh_tien": 33252200
+      },
+      {
+        "ten_hang": "Phí bảo trì máy tính",
+        "dvt": "Lần",
+        "so_luong": 4,
+        "don_gia": 702800,
+        "thanh_tien": 2811200
+      }
+    ],
+    "tong_truoc_thue": 44689120,
+    "thue_suat": 10,
+    "tien_thue": 4468912,
+    "tong_thanh_toan": 49158032,
+    "bang_chu": "Bốn mươi chín triệu một trăm năm mươi tám nghìn không trăm ba mươi hai đồng",
+    "mau_trinh_bay": "C",
+    "anh": "images/HD004.png",
+    "lam_nhieu": false
+  },
+  {
+    "id": "HD005",
+    "mau_so": "1",
+    "ky_hieu": "K26THH",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "PXHCSDQC",
+    "stk_nguoi_ban": "565849955568",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "6395506",
+    "ngay_lap": "23/09/2026",
+    "ten_nguoi_ban": "Công ty CP Dịch vụ Mẫu Thử Bình",
+    "mst_nguoi_ban": "0079361262",
+    "dia_chi_nguoi_ban": "Số 63 đường Nguyễn Trãi, Cần Thơ",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "TM/CK",
+    "dong_hang": [
+      {
+        "ten_hang": "Vé máy bay nội địa",
+        "dvt": "Vé",
+        "so_luong": 3,
+        "don_gia": 2002800,
+        "thanh_tien": 6008400
+      },
+      {
+        "ten_hang": "Bút bi Thiên Long TL-027",
+        "dvt": "Cái",
+        "so_luong": 8,
+        "don_gia": 5000,
+        "thanh_tien": 40000
+      },
+      {
+        "ten_hang": "Mực in HP 12A",
+        "dvt": "Hộp",
+        "so_luong": 3,
+        "don_gia": 1108900,
+        "thanh_tien": 3326700
+      },
+      {
+        "ten_hang": "Nước uống đóng bình 20L",
+        "dvt": "Bình",
+        "so_luong": 6,
+        "don_gia": 60400,
+        "thanh_tien": 362400
+      },
+      {
+        "ten_hang": "Cước internet cáp quang tháng",
+        "dvt": "Tháng",
+        "so_luong": 4,
+        "don_gia": 639100,
+        "thanh_tien": 2556400
+      }
+    ],
+    "tong_truoc_thue": 12293900,
+    "thue_suat": 10,
+    "tien_thue": 1229390,
+    "tong_thanh_toan": 13523290,
+    "bang_chu": "Mười ba triệu năm trăm hai mươi ba nghìn hai trăm chín mươi đồng",
+    "mau_trinh_bay": "A",
+    "anh": "images/HD005.png",
+    "lam_nhieu": false
+  },
+  {
+    "id": "HD006",
+    "mau_so": "1",
+    "ky_hieu": "K26TNE",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "D6BKA68Q",
+    "stk_nguoi_ban": "228963365701",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "9164215",
+    "ngay_lap": "14/05/2026",
+    "ten_nguoi_ban": "Công ty TNHH Nội thất Mẫu Thử Tâm",
+    "mst_nguoi_ban": "0269451428",
+    "dia_chi_nguoi_ban": "Số 7 đường Giải Phóng, Đà Nẵng",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Nước uống đóng bình 20L",
+        "dvt": "Bình",
+        "so_luong": 3,
+        "don_gia": 54100,
+        "thanh_tien": 162300
+      },
+      {
+        "ten_hang": "Chuột không dây Logitech M331",
+        "dvt": "Cái",
+        "so_luong": 1,
+        "don_gia": 271200,
+        "thanh_tien": 271200
+      }
+    ],
+    "tong_truoc_thue": 433500,
+    "thue_suat": 0,
+    "tien_thue": 0,
+    "tong_thanh_toan": 433500,
+    "bang_chu": "Bốn trăm ba mươi ba nghìn năm trăm đồng",
+    "mau_trinh_bay": "B",
+    "anh": "images/HD006.png",
+    "lam_nhieu": false
+  },
+  {
+    "id": "HD007",
+    "mau_so": "1",
+    "ky_hieu": "C26TXT",
+    "ma_co_quan_thue": "MẪU-THỬ-749D4F7041BD",
+    "ma_tra_cuu": "F8XLZD7D",
+    "stk_nguoi_ban": "759923657965",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "6349150",
+    "ngay_lap": "06/04/2026",
+    "ten_nguoi_ban": "Công ty TNHH In ấn Mẫu Thử Minh",
+    "mst_nguoi_ban": "0124939111",
+    "dia_chi_nguoi_ban": "Số 112 đường Nguyễn Văn Linh, TP. Hồ Chí Minh",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Dịch vụ vận chuyển hàng hóa",
+        "dvt": "Chuyến",
+        "so_luong": 4,
+        "don_gia": 1762300,
+        "thanh_tien": 7049200
+      },
+      {
+        "ten_hang": "Vé máy bay nội địa",
+        "dvt": "Vé",
+        "so_luong": 2,
+        "don_gia": 1849000,
+        "thanh_tien": 3698000
+      },
+      {
+        "ten_hang": "Tiền thuê phòng họp",
+        "dvt": "Giờ",
+        "so_luong": 2,
+        "don_gia": 209200,
+        "thanh_tien": 418400
+      },
+      {
+        "ten_hang": "Giấy in A4 Double A 70gsm",
+        "dvt": "Ream",
+        "so_luong": 4,
+        "don_gia": 71700,
+        "thanh_tien": 286800
+      }
+    ],
+    "tong_truoc_thue": 11452400,
+    "thue_suat": 10,
+    "tien_thue": 1145240,
+    "tong_thanh_toan": 12597640,
+    "bang_chu": "Mười hai triệu năm trăm chín mươi bảy nghìn sáu trăm bốn mươi đồng",
+    "mau_trinh_bay": "A",
+    "anh": "images/HD007.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD008",
+    "mau_so": "1",
+    "ky_hieu": "C26TRU",
+    "ma_co_quan_thue": "MẪU-THỬ-4F999ABE7249",
+    "ma_tra_cuu": "2X95TMV6",
+    "stk_nguoi_ban": "430563654103",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "1133528",
+    "ngay_lap": "11/01/2026",
+    "ten_nguoi_ban": "Công ty CP Thực phẩm Mẫu Thử Lan",
+    "mst_nguoi_ban": "0504834002",
+    "dia_chi_nguoi_ban": "Số 76 đường Trần Phú, Hà Nội",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Tiền mặt",
+    "dong_hang": [
+      {
+        "ten_hang": "Bút bi Thiên Long TL-027",
+        "dvt": "Cái",
+        "so_luong": 4,
+        "don_gia": 4600,
+        "thanh_tien": 18400
+      }
+    ],
+    "tong_truoc_thue": 18400,
+    "thue_suat": 10,
+    "tien_thue": 1840,
+    "tong_thanh_toan": 20240,
+    "bang_chu": "Hai mươi nghìn hai trăm bốn mươi đồng",
+    "mau_trinh_bay": "P",
+    "anh": "images/HD008.png",
+    "lam_nhieu": false
+  },
+  {
+    "id": "HD009",
+    "mau_so": "1",
+    "ky_hieu": "K26TCK",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "RKAWDJAS",
+    "stk_nguoi_ban": "218589283516",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "2644906",
+    "ngay_lap": "07/03/2026",
+    "ten_nguoi_ban": "Công ty CP Thực phẩm Mẫu Thử Lan",
+    "mst_nguoi_ban": "0108923498",
+    "dia_chi_nguoi_ban": "Số 89 đường Phạm Văn Đồng, TP. Hồ Chí Minh",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Vé máy bay nội địa",
+        "dvt": "Vé",
+        "so_luong": 5,
+        "don_gia": 3284500,
+        "thanh_tien": 16422500
+      },
+      {
+        "ten_hang": "Mực in HP 12A",
+        "dvt": "Hộp",
+        "so_luong": 1,
+        "don_gia": 941800,
+        "thanh_tien": 941800
+      },
+      {
+        "ten_hang": "Nước uống đóng bình 20L",
+        "dvt": "Bình",
+        "so_luong": 4,
+        "don_gia": 61700,
+        "thanh_tien": 246800
+      },
+      {
+        "ten_hang": "Giấy in A4 Double A 70gsm",
+        "dvt": "Ream",
+        "so_luong": 7,
+        "don_gia": 85400,
+        "thanh_tien": 597800
+      },
+      {
+        "ten_hang": "Dịch vụ vận chuyển hàng hóa",
+        "dvt": "Chuyến",
+        "so_luong": 2,
+        "don_gia": 2087700,
+        "thanh_tien": 4175400
+      }
+    ],
+    "tong_truoc_thue": 22384300,
+    "thue_suat": 10,
+    "tien_thue": 2238430,
+    "tong_thanh_toan": 24622730,
+    "bang_chu": "Hai mươi bốn triệu sáu trăm hai mươi hai nghìn bảy trăm ba mươi đồng",
+    "mau_trinh_bay": "B",
+    "anh": "images/HD009.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD010",
+    "mau_so": "1",
+    "ky_hieu": "C26TKV",
+    "ma_co_quan_thue": "MẪU-THỬ-FBFBDFEFE66A",
+    "ma_tra_cuu": "6YSUXEZ5",
+    "stk_nguoi_ban": "674929781206",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "6258842",
+    "ngay_lap": "02/05/2026",
+    "ten_nguoi_ban": "Công ty CP Vận tải Mẫu Thử Dũng",
+    "mst_nguoi_ban": "0073487637",
+    "dia_chi_nguoi_ban": "Số 167 đường Giải Phóng, TP. Hồ Chí Minh",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "TM/CK",
+    "dong_hang": [
+      {
+        "ten_hang": "Cước internet cáp quang tháng",
+        "dvt": "Tháng",
+        "so_luong": 3,
+        "don_gia": 900300,
+        "thanh_tien": 2700900
+      }
+    ],
+    "tong_truoc_thue": 2700900,
+    "thue_suat": 0,
+    "tien_thue": 0,
+    "tong_thanh_toan": 2700900,
+    "bang_chu": "Hai triệu bảy trăm nghìn chín trăm đồng",
+    "mau_trinh_bay": "B",
+    "anh": "images/HD010.png",
+    "lam_nhieu": false
+  },
+  {
+    "id": "HD011",
+    "mau_so": "1",
+    "ky_hieu": "K26MMP",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "WM7BAQJT",
+    "stk_nguoi_ban": "639284812262",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "1742566",
+    "ngay_lap": "31/08/2026",
+    "ten_nguoi_ban": "Công ty CP Vận tải Mẫu Thử Dũng",
+    "mst_nguoi_ban": "0806593007",
+    "dia_chi_nguoi_ban": "Số 264 đường Nguyễn Trãi, Hà Nội",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Chuyển khoản",
+    "dong_hang": [
+      {
+        "ten_hang": "Mực in HP 12A",
+        "dvt": "Hộp",
+        "so_luong": 5,
+        "don_gia": 1103000,
+        "thanh_tien": 5515000
+      }
+    ],
+    "tong_truoc_thue": 5515000,
+    "thue_suat": 8,
+    "tien_thue": 441200,
+    "tong_thanh_toan": 5956200,
+    "bang_chu": "Năm triệu chín trăm năm mươi sáu nghìn hai trăm đồng",
+    "mau_trinh_bay": "P",
+    "anh": "images/HD011.png",
+    "lam_nhieu": true
+  },
+  {
+    "id": "HD012",
+    "mau_so": "1",
+    "ky_hieu": "K26TKR",
+    "ma_co_quan_thue": "",
+    "ma_tra_cuu": "JQQMSY3S",
+    "stk_nguoi_ban": "981678441541",
+    "ngan_hang": "Ngân hàng TMCP Mẫu Thử",
+    "so_hoa_don": "7332580",
+    "ngay_lap": "17/07/2026",
+    "ten_nguoi_ban": "Công ty CP Dịch vụ Mẫu Thử Bình",
+    "mst_nguoi_ban": "0623692324",
+    "dia_chi_nguoi_ban": "Số 171 đường Nguyễn Văn Linh, Đà Nẵng",
+    "ten_nguoi_mua": "Công ty TNHH Khách Hàng Mẫu Thử",
+    "mst_nguoi_mua": "0109999990",
+    "dia_chi_nguoi_mua": "Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội",
+    "hinh_thuc_tt": "Tiền mặt",
+    "dong_hang": [
+      {
+        "ten_hang": "Dịch vụ vận chuyển hàng hóa",
+        "dvt": "Chuyến",
+        "so_luong": 3,
+        "don_gia": 1006500,
+        "thanh_tien": 3019500
+      },
+      {
+        "ten_hang": "Dịch vụ in ấn tài liệu",
+        "dvt": "Trang",
+        "so_luong": 12,
+        "don_gia": 1670,
+        "thanh_tien": 20040
+      }
+    ],
+    "tong_truoc_thue": 3039540,
+    "thue_suat": 8,
+    "tien_thue": 243163,
+    "tong_thanh_toan": 3282703,
+    "bang_chu": "Ba triệu hai trăm tám mươi hai nghìn bảy trăm lẻ ba đồng",
+    "mau_trinh_bay": "A",
+    "anh": "images/HD012.png",
+    "lam_nhieu": false
+  }
+]

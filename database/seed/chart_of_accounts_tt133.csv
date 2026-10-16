@@ -1,0 +1,35 @@
+account_code,account_name
+111,Tiền mặt
+112,Tiền gửi ngân hàng
+131,Phải thu của khách hàng
+133,Thuế GTGT được khấu trừ
+1331,"Thuế GTGT được khấu trừ của hàng hóa, dịch vụ"
+141,Tạm ứng
+152,"Nguyên liệu, vật liệu"
+153,"Công cụ, dụng cụ"
+155,Thành phẩm
+156,Hàng hóa
+211,Tài sản cố định
+214,Hao mòn tài sản cố định
+242,Chi phí trả trước
+331,Phải trả cho người bán
+333,Thuế và các khoản phải nộp Nhà nước
+3331,Thuế giá trị gia tăng phải nộp
+334,Phải trả người lao động
+338,"Phải trả, phải nộp khác"
+411,Vốn đầu tư của chủ sở hữu
+421,Lợi nhuận sau thuế chưa phân phối
+511,Doanh thu bán hàng và cung cấp dịch vụ
+515,Doanh thu hoạt động tài chính
+621,"Chi phí nguyên liệu, vật liệu trực tiếp"
+622,Chi phí nhân công trực tiếp
+627,Chi phí sản xuất chung
+632,Giá vốn hàng bán
+635,Chi phí tài chính
+642,Chi phí quản lý kinh doanh
+6421,Chi phí bán hàng
+6422,Chi phí quản lý doanh nghiệp
+711,Thu nhập khác
+811,Chi phí khác
+821,Chi phí thuế thu nhập doanh nghiệp
+911,Xác định kết quả kinh doanh

@@ -1,29 +1,35 @@
 # Setup Guide — ai-invoice-accounting
 
 Confirmed stack:
-- **Backend:** Python + FastAPI
-- **AI Service:** Python + FastAPI
-- **Frontend:** React + Tailwind CSS
-- **Database:** MySQL
+- **Backend:** Python 3.12 + FastAPI, SQLAlchemy, Alembic
+- **AI Service:** Python 3.12 + FastAPI — PaddleOCR (OCR, local), Gemini Flash (LLM, free tier),
+  scikit-learn / sentence-transformers / RapidFuzz (ML and matching)
+- **Frontend:** React + Vite + Tailwind CSS
+- **Database:** MySQL 8.0 (Docker)
 
 This document walks each team member through local setup, and explains
 how MySQL is configured to avoid common pitfalls (dropped connections,
-wrong charset, rounding errors on money values).
+wrong charset, rounding errors on money values). The README has the
+step-by-step installation of Python, Node.js, Docker and MySQL Workbench;
+this file covers configuration and the AI Service in detail.
 
 ---
 
 ## 0. Prerequisites
 
 Install on your machine:
-- Python 3.11+
+- Python **3.12** (not newer: some libraries have no pre-built packages for
+  3.13/3.14 yet, so `pip install` tries to compile them and fails)
 - Node.js 20 LTS+
 - Docker Desktop (recommended for running MySQL — avoids inconsistent
   local MySQL installs across the 3 team members)
 - Git
+- Free disk space: a few GB (PyTorch and the embedding model used for
+  purchase-order matching are large)
 
 Verify:
 ```bash
-python3 --version
+python3.12 --version     # Windows: py -3.12 --version
 node --version
 docker --version
 ```
@@ -42,10 +48,11 @@ different default charset.
 See the `docker-compose.yml` file already included in the repo. Key
 points to understand:
 
-- `MYSQL_CHARACTER_SET=utf8mb4` — **required** to correctly store
-  non-ASCII text (e.g. names with special characters or accented
-  letters). The old MySQL default (`latin1`) corrupts such text into
-  `?` or garbled characters.
+- `command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci`
+  — **required** to correctly store Vietnamese text and other non-ASCII
+  characters. The old MySQL default (`latin1`) corrupts such text into
+  `?` or garbled characters. (This is a server startup flag; there is no
+  `MYSQL_CHARACTER_SET` environment variable.)
 - `volumes` — MySQL data is stored outside the container, so data
   survives container restarts/removal (it's not wiped every time you
   run `docker compose down`).
@@ -110,7 +117,7 @@ properly, MySQL will eventually throw "Too many connections" once
 multiple people test simultaneously (including during the thesis
 defense demo if all 3 members test at once). Use SQLAlchemy with a
 pre-configured connection pool (see `backend/app/database.py`) instead
-of manually managing raw `mysql-connector` connections in each route.
+of manually managing raw connections in each route.
 
 ### 2.4. Always use migrations (Alembic), never edit the schema by hand
 
@@ -132,27 +139,97 @@ docker exec ai-invoice-mysql mysqldump -u app_user -p ai_invoice_db > backup.sql
 
 ### 3.1. AI Service (`ai-service/`)
 
+The AI Service does the heavy work: OCR with PaddleOCR (local), data
+extraction with the Gemini API, and the machine-learning models (GL coding,
+purchase-order matching, anomaly detection). XML e-invoices are read
+directly by the backend/AI Service without OCR.
+
 ```bash
 cd ai-service
-python3 -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+python3.12 -m venv venv           # Windows: py -3.12 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m pip install --upgrade pip
+```
+
+**Windows PowerShell:** if activating the venv is blocked by script
+policy, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+**a) PaddlePaddle (the engine PaddleOCR runs on) — install first, CPU build:**
+```bash
+python -m pip install paddlepaddle==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
+python -c "import paddle; print(paddle.__version__)"
+```
+It should print a version number. If pip cannot find a build for your
+Python version or OS, tell the team before changing anything (see section 7).
+Installation was checked against the PaddlePaddle docs, not on every
+operating system, so each member should run this check.
+
+**b) Core packages:**
+```bash
 pip install -r requirements.txt
+```
+`requirements.txt` holds: FastAPI, Uvicorn, python-dotenv, Pillow,
+`paddleocr`, `google-genai` (Gemini SDK), and RapidFuzz.
+
+**c) Machine-learning packages (needed for GL coding, PO matching and anomaly detection):**
+```bash
+# Windows/Linux: install the CPU build of PyTorch first to avoid a huge download
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-ml.txt
+```
+`requirements-ml.txt` holds: scikit-learn and sentence-transformers.
+macOS users can skip the `torch` line (the normal `pip install` works).
+
+**d) First-run downloads.** The first time the service runs it downloads:
+- the PaddleOCR Vietnamese text-recognition model (needs internet);
+- the `bge-m3` embedding model when purchase-order matching is first
+  used (large, around a few GB of disk — download it once on a good connection).
+
+Check that PaddleOCR loads (this triggers the model download):
+```bash
+python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='vi'); print('PaddleOCR OK')"
+```
+
+**e) Gemini API key.** Create a key at https://aistudio.google.com/apikey
+and put it in the root `.env` as `GEMINI_API_KEY` (section 4).
+
+**f) Run the service:**
+```bash
 uvicorn app.main:app --reload --port 8001
 ```
 No local `.env` file is needed — it automatically loads the single root
 `.env` (see section 4).
 
+> **Privacy:** the Gemini free tier may use submitted data to improve
+> Google's products. Only send synthetic or masked invoices (tax ID and
+> company names hidden). Free-tier limits change often; check
+> https://ai.google.dev/gemini-api/docs/rate-limits.
+
 ### 3.2. Backend (`backend/`)
 
 ```bash
 cd backend
-python3 -m venv venv
-source venv/bin/activate
+python3.12 -m venv venv           # Windows: py -3.12 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 alembic upgrade head            # create tables from the latest migration
 uvicorn app.main:app --reload --port 8000
 ```
 Also reads the root `.env` automatically — no local `.env` file needed.
+`alembic upgrade head` creates all 9 tables of the ERD (migration `0001`).
+
+Seed data (run inside `backend/`, MySQL must be up):
+
+```bash
+python scripts/seed_coa.py     # load the Chart of Accounts (TT133) - safe to re-run
+python scripts/seed_demo.py    # DEV ONLY: seed_coa + 2 demo users
+                               # ktv@demo.local / ktv12345 (KTV), ktt@demo.local / ktt12345 (KTT)
+```
+
+Check it works: open http://localhost:8000/api/health and
+http://localhost:8000/docs. Most business endpoints are **mock** for now
+(`"mock": true` in the response) — see `docs/PHAN_CONG.md`. Run tests with
+`pytest` (they use a temporary SQLite file, no MySQL needed).
 
 ### 3.3. Frontend (`frontend/`)
 
@@ -161,6 +238,7 @@ cd frontend
 npm install
 npm run dev
 ```
+Opens at http://localhost:5173 by default.
 
 ---
 
@@ -185,9 +263,10 @@ Git). Each team member copies it once to `.env` (already excluded via
 ### 4.2. Create your `.env` file
 
 ```bash
-cp .env.example .env
+cp .env.example .env              # Windows PowerShell: copy .env.example .env
 ```
-That's it — one command, run once at the project root.
+That's it — one command, run once at the project root. Then fill in your
+own `GEMINI_API_KEY`.
 
 ### 4.3. What each variable means
 
@@ -200,10 +279,15 @@ That's it — one command, run once at the project root.
 | `DB_PORT` | backend | MySQL port, default `3306` |
 | `DB_USER` / `DB_PASSWORD` / `DB_NAME` | backend | **Must exactly match** the `MYSQL_*` values above — a mismatch causes "Access denied" errors |
 | `SECRET_KEY` | backend | Secret string used to sign JWT tokens (login). Use a long random string, especially before any real deployment |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | backend | JWT lifetime in minutes, default `480` |
+| `UPLOAD_DIR` | backend | Where uploaded invoice files are stored, default `storage/uploads` (git-ignored) |
 | `AI_SERVICE_URL` | backend | Address the backend uses to call the AI service, default `http://localhost:8001` |
-| `GOOGLE_APPLICATION_CREDENTIALS` | ai-service | Path to the Google Cloud Vision API JSON key (leave blank if using Tesseract instead) |
-| `LLM_API_KEY` | ai-service | API key for OpenAI/Claude, used to parse invoice data. **Never commit a real key to Git** |
-| `LLM_MODEL` | ai-service | Which LLM model to call, e.g. `gpt-4o-mini` |
+| `GEMINI_API_KEY` | ai-service | Your own Gemini API key from Google AI Studio. **Never commit a real key to Git** |
+| `LLM_MODEL` | ai-service | Which Gemini Flash model to call. Use the current Flash model name shown in the Gemini API docs (https://ai.google.dev/gemini-api/docs/quickstart) and make sure it has a free tier |
+
+Optional, only when the Google Sheet export feature is implemented: a path
+to a Google service-account JSON key. Add the variable name used in the code
+to `.env.example` at that time.
 
 ### 4.4. Common `.env`-related errors
 
@@ -218,6 +302,8 @@ That's it — one command, run once at the project root.
   `docker compose down -v` (this wipes the volume) then
   `docker compose up -d mysql` again so MySQL re-initializes with the
   new values
+- **Using an old `.env.example` copy** → download or pull the latest from
+  Git; an old 4-line version will miss variables such as `GEMINI_API_KEY`
 - **Accidentally committed a real `.env` to GitHub** → rotate that
   password/API key immediately (treat it as compromised), then remove it
   from Git history with `git rm --cached .env` and commit again
@@ -226,9 +312,97 @@ That's it — one command, run once at the project root.
 
 ## 5. Daily startup order
 
+Open a separate terminal for each service (works the same on Windows,
+Mac and Linux):
+
 ```bash
-docker compose up -d mysql       # 1. start the database first
-cd backend && uvicorn app.main:app --reload --port 8000 &   # 2. start backend
-cd ai-service && uvicorn app.main:app --reload --port 8001 & # 3. start AI service
-cd frontend && npm run dev       # 4. start frontend last
+# 1. database (from the project root)
+docker compose up -d mysql
+
+# 2. backend — terminal 2
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload --port 8000
+
+# 3. AI service — terminal 3
+cd ai-service && source venv/bin/activate && uvicorn app.main:app --reload --port 8001
+
+# 4. frontend — terminal 4
+cd frontend && npm run dev
 ```
+(Windows: activate with `venv\Scripts\activate` instead of `source venv/bin/activate`.)
+
+Ports: backend 8000, AI service 8001, frontend 5173, MySQL 3306.
+
+---
+
+## 6. Test data (synthetic invoices)
+
+Real invoices from hoadondientu are not available during development, so
+the team tests OCR and the LLM on **synthetic invoices with known answers**.
+The generator and scorer live in `tools/`.
+
+**Requirements:** `pip install reportlab pillow numpy` (inside any venv) and
+`pdftoppm` from Poppler:
+- Windows: download Poppler for Windows and add its `bin` folder to PATH
+- Mac: `brew install poppler`
+- Ubuntu/Debian: `sudo apt install poppler-utils`
+- Arch/CachyOS: `sudo pacman -S poppler`
+
+The generator draws with DejaVu fonts. On Windows or macOS, change `FONT_DIR`
+at the top of `tools/gen_invoices.py` to the folder that contains
+`DejaVuSans.ttf`.
+
+**Generate 40 invoices** (PDF, images — about 60% degraded to look like phone
+photos —, simplified XML, and labels):
+```bash
+python tools/gen_invoices.py --n 40 --out data_test --seed 1
+```
+To generate only the bilingual e-invoice layout (closest to the layout of
+e-invoices shown on the tax portal: Vietnamese/English labels, column-number
+row, digital-signature box, tax-authority code, lookup code), add
+`--style portal`. Labels use `mau_so` = `1` and `ky_hieu` = `C26TAA`
+(form number kept separate; some invoices print `1C26TAA`, and the scorer
+accepts both).
+
+`data_test/` is for local testing — do not commit it if it grows large.
+All company names, tax IDs and addresses are fake, and every invoice carries a
+"synthetic data" line.
+
+**Score OCR/LLM output.** Save the extracted fields of each invoice as
+`pred/HD001.json`, `pred/HD002.json`, ... (fields such as `so_hoa_don`,
+`ky_hieu`, `ngay_lap`, `mst_nguoi_ban`, `tong_thanh_toan`), then:
+```bash
+python tools/score_fields.py --labels data_test/labels.json --pred pred/
+```
+The output is the accuracy per field, split into clean and degraded images.
+
+**Limits:** the synthetic set has only 3 layouts and is cleaner than real
+invoices, so accuracy measured on it is higher than on real invoices.
+If the report uses these numbers, state that they come from synthetic data
+and a small sample. The XML is a simplified imitation, not validated against
+the official schema.
+
+---
+
+## 7. Troubleshooting
+
+- **`pip install` fails while building `pydantic-core` or `pillow`
+  (a Rust/wheel build error)** → your Python is too new (for example 3.14).
+  Delete the `venv` folder, recreate it with Python 3.12
+  (`python3.12 -m venv venv`), and install again.
+- **`import paddle` fails or pip finds no `paddlepaddle` build** → check the
+  Python version in the active venv (`python --version` must say 3.12), and
+  that you used the PaddlePaddle CPU index URL from section 3.1 a). If it still
+  fails, tell the team which OS and Python version you have before trying other
+  versions, so everyone ends up on the same setup.
+- **PaddleOCR is slow the first time** → it is downloading models; later
+  runs are faster.
+- **Gemini returns a quota / 429 error** → you hit the free-tier limit; wait,
+  reduce the number of requests, or check the current limits.
+- **Gemini returns a "model not found" error** → update `LLM_MODEL` to the
+  current Flash model name in the Gemini API docs.
+- **`sentence-transformers` or `torch` download is huge or slow** → install the
+  CPU build of PyTorch first (section 3.1 c) and do it on a stable connection.
+- **Vietnamese text shows as `?` in MySQL** → the database was not created
+  with `utf8mb4` (section 2.1).
+- **The backend says "Connection refused" for MySQL right after startup** →
+  MySQL is still booting; wait until `docker compose ps` shows `healthy`.

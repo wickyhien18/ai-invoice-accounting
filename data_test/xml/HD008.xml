@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DU LIEU GIA, cau truc mo phong don gian hoa, chua kiem tra voi XSD chinh thuc -->
+<HDon><DLHDon><TTChung><PBan>2.0.0</PBan><THDon>Hóa đơn giá trị gia tăng</THDon><KHMSHDon>1</KHMSHDon><KHHDon>C26TRU</KHHDon><SHDon>1133528</SHDon><NLap>2026-01-11</NLap><DVTTe>VND</DVTTe><HTTToan>Tiền mặt</HTTToan></TTChung>
+<NDHDon><NBan><Ten>Công ty CP Thực phẩm Mẫu Thử Lan</Ten><MST>0504834002</MST><DChi>Số 76 đường Trần Phú, Hà Nội</DChi></NBan>
+<NMua><Ten>Công ty TNHH Khách Hàng Mẫu Thử</Ten><MST>0109999990</MST><DChi>Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Bút bi Thiên Long TL-027</THHDVu><DVTinh>Cái</DVTinh><SLuong>4</SLuong><DGia>4600</DGia><ThTien>18400</ThTien><TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>18400</TgTCThue><TgTThue>1840</TgTThue><TgTTTBSo>20240</TgTTTBSo><TgTTTBChu>Hai mươi nghìn hai trăm bốn mươi đồng</TgTTTBChu></TToan></NDHDon></DLHDon><MCCQT>MẪU-THỬ-4F999ABE7249</MCCQT></HDon>

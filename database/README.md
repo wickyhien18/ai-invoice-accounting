@@ -1,19 +1,10 @@
-# Database
+# database/
 
-Contains schema, migrations, and seed data.
-
-## Important seed data: Chart of Accounts
-
-Seed the account list per Appendix 1, Circular 133/2016/TT-BTC (or
-200/2014/TT-BTC if the team targets larger enterprises instead).
-
-Reference source:
-- https://thuvienphapluat.vn/van-ban/Doanh-nghiep/Thong-tu-133-2016-TT-BTC-huong-dan-che-do-ke-toan-doanh-nghiep-nho-va-vua-284997.aspx
-
-## Planned files
-```
-database/
-├── schema.sql                    # DDL for the main tables
-├── seed_chart_of_accounts.sql    # Sample account list (111, 112, 331, 642, 156...)
-└── er-diagram.png                # ERD (exported from Chapter 3 of the report)
-```
+- `seed/chart_of_accounts_tt133.csv`: danh sách tài khoản kế toán dùng cho bảng `chart_of_accounts`
+  (mã tài khoản, tên). Đây là bản tham khảo gồm các tài khoản hay dùng khi nhập hóa đơn. **Cần đối chiếu
+  với văn bản Thông tư 133/2016/TT-BTC** (tên và mã tài khoản) trước khi dùng cho báo cáo.
+- Nạp vào CSDL (chạy trong `backend/`, sau khi đã `alembic upgrade head`):
+  ```bash
+  python scripts/seed_coa.py
+  ```
+- Cấu trúc bảng nằm trong `backend/app/models/` và migration trong `backend/alembic/versions/`.

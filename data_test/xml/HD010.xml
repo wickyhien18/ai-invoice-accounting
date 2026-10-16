@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DU LIEU GIA, cau truc mo phong don gian hoa, chua kiem tra voi XSD chinh thuc -->
+<HDon><DLHDon><TTChung><PBan>2.0.0</PBan><THDon>Hóa đơn giá trị gia tăng</THDon><KHMSHDon>1</KHMSHDon><KHHDon>C26TKV</KHHDon><SHDon>6258842</SHDon><NLap>2026-05-02</NLap><DVTTe>VND</DVTTe><HTTToan>TM/CK</HTTToan></TTChung>
+<NDHDon><NBan><Ten>Công ty CP Vận tải Mẫu Thử Dũng</Ten><MST>0073487637</MST><DChi>Số 167 đường Giải Phóng, TP. Hồ Chí Minh</DChi></NBan>
+<NMua><Ten>Công ty TNHH Khách Hàng Mẫu Thử</Ten><MST>0109999990</MST><DChi>Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Cước internet cáp quang tháng</THHDVu><DVTinh>Tháng</DVTinh><SLuong>3</SLuong><DGia>900300</DGia><ThTien>2700900</ThTien><TSuat>0%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>2700900</TgTCThue><TgTThue>0</TgTThue><TgTTTBSo>2700900</TgTTTBSo><TgTTTBChu>Hai triệu bảy trăm nghìn chín trăm đồng</TgTTTBChu></TToan></NDHDon></DLHDon><MCCQT>MẪU-THỬ-FBFBDFEFE66A</MCCQT></HDon>

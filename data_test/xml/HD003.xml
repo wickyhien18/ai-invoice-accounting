@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- DU LIEU GIA, cau truc mo phong don gian hoa, chua kiem tra voi XSD chinh thuc -->
+<HDon><DLHDon><TTChung><PBan>2.0.0</PBan><THDon>Hóa đơn giá trị gia tăng</THDon><KHMSHDon>1</KHMSHDon><KHHDon>C26TMD</KHHDon><SHDon>8981012</SHDon><NLap>2026-01-03</NLap><DVTTe>VND</DVTTe><HTTToan>Tiền mặt</HTTToan></TTChung>
+<NDHDon><NBan><Ten>Công ty TNHH Thiết bị IT Mẫu Thử Quang</Ten><MST>0235290563</MST><DChi>Số 215 đường Trần Phú, Đà Nẵng</DChi></NBan>
+<NMua><Ten>Công ty TNHH Khách Hàng Mẫu Thử</Ten><MST>0109999990</MST><DChi>Số 1 Đường Thử Nghiệm, Phường Mẫu, Quận Giả, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><THHDVu>Chuột không dây Logitech M331</THHDVu><DVTinh>Cái</DVTinh><SLuong>5</SLuong><DGia>306900</DGia><ThTien>1534500</ThTien><TSuat>0%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><THHDVu>Dịch vụ in ấn tài liệu</THHDVu><DVTinh>Trang</DVTinh><SLuong>19</SLuong><DGia>748</DGia><ThTien>14212</ThTien><TSuat>0%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>3</STT><THHDVu>Tiền thuê phòng họp</THHDVu><DVTinh>Giờ</DVTinh><SLuong>4</SLuong><DGia>563200</DGia><ThTien>2252800</ThTien><TSuat>0%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>3801512</TgTCThue><TgTThue>0</TgTThue><TgTTTBSo>3801512</TgTTTBSo><TgTTTBChu>Ba triệu tám trăm lẻ một nghìn năm trăm mười hai đồng</TgTTTBChu></TToan></NDHDon></DLHDon><MCCQT>MẪU-THỬ-34E56ABC73E5</MCCQT></HDon>
