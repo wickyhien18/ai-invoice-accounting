@@ -154,6 +154,25 @@ python -m pip install --upgrade pip
 **Windows PowerShell:** if activating the venv is blocked by script
 policy, run once: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
+**Check you are in the right venv (do this every time, before installing or testing).**
+`backend/` and `ai-service/` each have their own folder named `venv`, so the
+`(venv)` shown in your prompt does NOT tell you which one is active. Packages
+installed into the backend venv are invisible to the AI Service and vice versa.
+```bash
+which python          # Windows PowerShell: (Get-Command python).Source
+python --version
+```
+- The path must end with `ai-service/venv/bin/python` (Windows:
+  `ai-service\venv\Scripts\python.exe`). If it points to `backend/venv` or
+  `/usr/bin/python`, run `deactivate`, then `cd` into `ai-service` and activate
+  again.
+- The version must be `Python 3.12.x`.
+- Keep the same terminal (still activated) for all the checks below. After
+  `deactivate`, `python` is the system Python and every `import` will fail
+  with `No module named ...`.
+- Always install with `python -m pip ...` (not bare `pip`), so packages go into
+  the Python you just checked.
+
 **a) PaddlePaddle (the engine PaddleOCR runs on) — install first, CPU build:**
 ```bash
 python -m pip install paddlepaddle==3.2.0 -i https://www.paddlepaddle.org.cn/packages/stable/cpu/
@@ -170,6 +189,14 @@ pip install -r requirements.txt
 ```
 `requirements.txt` holds: FastAPI, Uvicorn, python-dotenv, Pillow,
 `paddleocr`, `google-genai` (Gemini SDK), and RapidFuzz.
+
+Verify that PaddleOCR was really installed (an outdated `requirements.txt`
+without the `paddleocr` line installs everything else without any error):
+```bash
+python -m pip show paddleocr      # must print a "Version:" line
+```
+If it prints `WARNING: Package(s) not found`, run `git pull` to get the latest
+`requirements.txt`, or install it directly: `python -m pip install paddleocr`.
 
 **c) Machine-learning packages (needed for GL coding, PO matching and anomaly detection):**
 ```bash
@@ -189,6 +216,7 @@ Check that PaddleOCR loads (this triggers the model download):
 ```bash
 python -c "from paddleocr import PaddleOCR; PaddleOCR(lang='vi'); print('PaddleOCR OK')"
 ```
+A `UserWarning: No ccache found` message is harmless; ignore it.
 
 **e) Gemini API key.** Create a key at https://aistudio.google.com/apikey
 and put it in the root `.env` as `GEMINI_API_KEY` (section 4).
@@ -394,6 +422,18 @@ the official schema.
   that you used the PaddlePaddle CPU index URL from section 3.1 a). If it still
   fails, tell the team which OS and Python version you have before trying other
   versions, so everyone ends up on the same setup.
+- **`ModuleNotFoundError: No module named 'paddle'` or `'paddleocr'`** → work
+  through these in order:
+  1. Wrong venv or no venv: run `which python`. It must end with
+     `ai-service/venv/bin/python` (section 3.1, "Check you are in the right
+     venv"). A path under `backend/venv` or `/usr/bin/python` is the cause.
+  2. Only `paddleocr` is missing while `import paddle` works: the package was
+     never installed, usually because `requirements.txt` is outdated. Run
+     `python -m pip show paddleocr`, then `git pull` or
+     `python -m pip install paddleocr`.
+  3. Only `paddle` is missing: repeat section 3.1 a) inside the right venv.
+  4. If you installed into the wrong venv by mistake, remove it there with
+     `python -m pip uninstall -y paddlepaddle` (while that venv is active).
 - **PaddleOCR is slow the first time** → it is downloading models; later
   runs are faster.
 - **Gemini returns a quota / 429 error** → you hit the free-tier limit; wait,
