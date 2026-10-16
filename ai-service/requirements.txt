@@ -1,5 +1,4 @@
 fastapi
-paddleocr
 uvicorn[standard]
 python-dotenv
 python-multipart
@@ -8,6 +7,6 @@ rapidfuzz
 google-genai
 pytest
 httpx
-# OCR: cai PaddlePaddle (CPU) TRUOC roi moi cai paddleocr. Xem SETUP.md muc 3.1
-# pip install paddlepaddle
-# pip install paddleocr
+# OCR: install PaddlePaddle (CPU build) first, using the index URL in
+# SETUP.md section 3.1 a). Do not use plain "pip install paddlepaddle".
+paddleocr
