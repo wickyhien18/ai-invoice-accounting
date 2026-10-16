@@ -258,11 +258,16 @@ limits of the model you use.
 
 ### Step 3: Run the AI Service
 
+> **Always install with `python -m pip`, never bare `pip`.** Bare `pip` can
+> belong to another venv or to the system Python (the backend and AI Service
+> venvs are both named `venv`), so packages silently land in the wrong place
+> or are missing from the one you use.
+
 ```bash
 cd ai-service
 python3.12 -m venv venv           # Windows: py -3.12 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
 ```
 
@@ -287,7 +292,8 @@ and the full AI Service notes, see [`SETUP.md`](./SETUP.md) section 3.1.
 cd backend
 python3.12 -m venv venv           # Windows: py -3.12 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python -c "import fastapi, sqlalchemy, alembic, pymysql, jwt, bcrypt; print('backend deps OK')"
 alembic upgrade head              # create all 9 tables
 python scripts/seed_demo.py       # dev only: CoA + demo users (see SETUP.md 3.2)
 uvicorn app.main:app --reload --port 8000
