@@ -26,7 +26,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
-FONT_DIR = "/usr/share/fonts/truetype/dejavu/"
+FONT_DIR = "/usr/share/fonts/TTF/"
 pdfmetrics.registerFont(TTFont("VN", FONT_DIR + "DejaVuSans.ttf"))
 pdfmetrics.registerFont(TTFont("VN-B", FONT_DIR + "DejaVuSans-Bold.ttf"))
 pdfmetrics.registerFont(TTFont("VN-S", FONT_DIR + "DejaVuSerif.ttf"))
