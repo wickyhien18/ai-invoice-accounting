@@ -382,9 +382,22 @@ The generator and scorer live in `tools/`.
 - Ubuntu/Debian: `sudo apt install poppler-utils`
 - Arch/CachyOS: `sudo pacman -S poppler`
 
-The generator draws with DejaVu fonts. On Windows or macOS, change `FONT_DIR`
-at the top of `tools/gen_invoices.py` to the folder that contains
-`DejaVuSans.ttf`.
+The generator draws with DejaVu fonts and loads `FONT_DIR + "DejaVuSans.ttf"`,
+so `FONT_DIR` (at the top of `tools/gen_invoices.py`) must be the folder that
+contains `DejaVuSans.ttf`, **ending with a `/`**. The default path only exists
+on Ubuntu/Debian. On any other system, install the font and set `FONT_DIR`:
+- Ubuntu/Debian: `sudo apt install fonts-dejavu-core`
+  (folder `/usr/share/fonts/truetype/dejavu/`)
+- Arch/CachyOS: `sudo pacman -S ttf-dejavu`
+  (folder usually `/usr/share/fonts/TTF/`)
+- Windows / macOS: download DejaVu Sans, then point `FONT_DIR` to the folder
+  that holds `DejaVuSans.ttf`
+
+To find the real folder on Linux:
+```bash
+fc-list | grep -i "DejaVuSans.ttf"
+```
+The path before `DejaVuSans.ttf` is your `FONT_DIR`.
 
 **Generate 40 invoices** (PDF, images — about 60% degraded to look like phone
 photos —, simplified XML, and labels):
@@ -448,6 +461,9 @@ the official schema.
   3. Only `paddle` is missing: repeat section 3.1 a) inside the right venv.
   4. If you installed into the wrong venv by mistake, remove it there with
      `python -m pip uninstall -y paddlepaddle` (while that venv is active).
+- **`TTFError: Can't open file ".../DejaVuSans.ttf"` when running
+  `tools/gen_invoices.py`** → the font is not at the default Ubuntu path.
+  Install DejaVu and fix `FONT_DIR` as described in section 6.
 - **PaddleOCR is slow the first time** → it is downloading models; later
   runs are faster.
 - **Gemini returns a quota / 429 error** → you hit the free-tier limit; wait,
