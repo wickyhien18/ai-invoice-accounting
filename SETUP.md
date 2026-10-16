@@ -185,7 +185,7 @@ operating system, so each member should run this check.
 
 **b) Core packages:**
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 `requirements.txt` holds: FastAPI, Uvicorn, python-dotenv, Pillow,
 `paddleocr`, `google-genai` (Gemini SDK), and RapidFuzz.
@@ -194,6 +194,7 @@ Verify that PaddleOCR was really installed (an outdated `requirements.txt`
 without the `paddleocr` line installs everything else without any error):
 ```bash
 python -m pip show paddleocr      # must print a "Version:" line
+python -c "import fastapi, PIL, rapidfuzz, google.genai, paddle, paddleocr; print('ai-service deps OK')"
 ```
 If it prints `WARNING: Package(s) not found`, run `git pull` to get the latest
 `requirements.txt`, or install it directly: `python -m pip install paddleocr`.
@@ -201,11 +202,11 @@ If it prints `WARNING: Package(s) not found`, run `git pull` to get the latest
 **c) Machine-learning packages (needed for GL coding, PO matching and anomaly detection):**
 ```bash
 # Windows/Linux: install the CPU build of PyTorch first to avoid a huge download
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements-ml.txt
+python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -r requirements-ml.txt
 ```
 `requirements-ml.txt` holds: scikit-learn and sentence-transformers.
-macOS users can skip the `torch` line (the normal `pip install` works).
+macOS users can skip the `torch` line (the normal `python -m pip install` works).
 
 **d) First-run downloads.** The first time the service runs it downloads:
 - the PaddleOCR Vietnamese text-recognition model (needs internet);
@@ -235,11 +236,17 @@ No local `.env` file is needed — it automatically loads the single root
 
 ### 3.2. Backend (`backend/`)
 
+Run these inside `backend/` with the **backend** venv active (`which python`
+must end with `backend/venv/bin/python`). The `python -c` line right after
+the install prints `backend deps OK` only if every package is importable; if
+it fails, the message names the missing one.
+
 ```bash
 cd backend
 python3.12 -m venv venv           # Windows: py -3.12 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+python -c "import fastapi, sqlalchemy, alembic, pymysql, jwt, bcrypt; print('backend deps OK')"
 alembic upgrade head            # create tables from the latest migration
 uvicorn app.main:app --reload --port 8000
 ```
@@ -368,7 +375,7 @@ Real invoices from hoadondientu are not available during development, so
 the team tests OCR and the LLM on **synthetic invoices with known answers**.
 The generator and scorer live in `tools/`.
 
-**Requirements:** `pip install reportlab pillow numpy` (inside any venv) and
+**Requirements:** `python -m pip install reportlab pillow numpy` (inside any venv) and
 `pdftoppm` from Poppler:
 - Windows: download Poppler for Windows and add its `bin` folder to PATH
 - Mac: `brew install poppler`
@@ -422,6 +429,13 @@ the official schema.
   that you used the PaddlePaddle CPU index URL from section 3.1 a). If it still
   fails, tell the team which OS and Python version you have before trying other
   versions, so everyone ends up on the same setup.
+- **Some packages are missing after `pip install -r requirements.txt` (for
+  example `sqlalchemy`)** → you most likely used bare `pip`, which can belong to
+  another venv or the system Python, or you ran the command in the wrong
+  folder (each of `backend/` and `ai-service/` has its own
+  `requirements.txt`). Run `pwd` and `which python`, then reinstall with
+  `python -m pip install -r requirements.txt` and run the `python -c "import ..."`
+  check of that component (section 3.1 or 3.2).
 - **`ModuleNotFoundError: No module named 'paddle'` or `'paddleocr'`** → work
   through these in order:
   1. Wrong venv or no venv: run `which python`. It must end with
