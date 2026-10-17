@@ -53,18 +53,34 @@ Luồng một hóa đơn:
 | Test tự động | backend 21/21, ai-service 21/21, `npm run build` thành công |
 | Chạy thật qua HTTP | tải PDF và XML qua backend → ai-service → CSDL; phát hiện hóa đơn trùng; file gốc trả 401 khi không có token |
 
-### 3.2. Chưa đo — cần chạy trên máy có PaddleOCR và khóa Gemini
+### 3.2. Đọc ảnh PNG (PaddleOCR) — đã đo trên 12 ảnh giả
 
-Môi trường dựng chỉ cho tải gói pip, không tải được mô hình PaddleOCR và không có khóa Gemini, nên **chưa có số liệu đọc ảnh**. Điền bảng sau bằng `tools/eval_extraction.py` (mỗi lệnh ghi `eval_out/<tên>/report.md`):
+Đo bằng `tools/eval_extraction.py` trên máy nhóm (PaddleOCR 3.x, Gemini `gemini-3.8-flash`), 12 ảnh PNG (6 sạch, 6 nhiễu), 9 trường mỗi ảnh = 108 ô. Đây là **mẫu nhỏ, hóa đơn giả**, không suy ra độ chính xác trên hóa đơn thật.
 
-| Cấu hình | Lệnh | Tổng ô đúng | Ảnh sạch | Ảnh nhiễu |
+| Cấu hình | Tổng ô đúng | Ảnh sạch | Ảnh nhiễu | Thời gian/ảnh |
 |---|---|---|---|---|
-| PaddleOCR + regex, không tiền xử lý | `--source images --no-llm --no-preprocess` | _chưa đo_ | | |
-| PaddleOCR + regex, có tiền xử lý | `--source images --no-llm` | _chưa đo_ | | |
-| PaddleOCR + Gemini, có tiền xử lý | `--source images` | _chưa đo_ | | |
-| PDF ép qua PaddleOCR | `--source pdf_ocr` | _chưa đo_ | | |
+| PaddleOCR + regex (có tiền xử lý) | 94/108 (87%) | | | 14,2 s |
+| PaddleOCR + Gemini (có tiền xử lý) | 97/108 (90%) | | | 19,0 s |
+| PaddleOCR + regex, không tiền xử lý | _chưa đo_ | | | |
+| PDF ép qua PaddleOCR | _chưa đo_ | | | |
 
-Cặp đầu cho biết tiền xử lý ảnh có ích không; cặp giữa cho biết Gemini cải thiện bao nhiêu so với regex. Nếu có thể, thử thêm vài hóa đơn thật đã che MST và tên rồi chấm tay.
+Độ chính xác theo trường (Gemini / regex): số ký hiệu 92% / 92%; số hóa đơn 92% / 83%; ngày lập 100% / 100%; MST 100% / 92%; tiền trước thuế 92% / 92%; thuế suất 100% / 92%; tiền thuế 100% / 100%; tổng thanh toán 92% / 92%; **tên người bán chỉ 42% ở cả hai** (5/12).
+
+Hiệu chuẩn độ tin cậy (ô xanh/vàng/đỏ có đúng thật không):
+
+| Dải | Regex: số ô, tỉ lệ đúng | Gemini: số ô, tỉ lệ đúng |
+|---|---|---|
+| Xanh ≥ 90 | 89 ô, 97% | 94 ô, 94% |
+| Vàng 70–90 | 15 ô, 53% | 13 ô, 69% |
+| Đỏ < 70 | 4 ô, 0% | 1 ô, 0% |
+
+Nhận xét:
+- Gemini chỉ hơn regex 3 điểm phần trăm (97 so với 94 ô đúng). Phần lớn cải thiện ở MST, thuế suất, số hóa đơn. Gemini chỉ nhận chữ do OCR đọc ra nên không sửa được lỗi OCR đã sai ký tự.
+- Ô đỏ đều sai (0% đúng) nên cảnh báo màu có tác dụng: kế toán biết phải kiểm tra. Ô xanh vẫn sai 3–6%, nên **không được bỏ bước người duyệt**.
+- Tên người bán là điểm yếu lớn nhất (5/12). Xem từng ảnh thì lỗi nằm ở OCR: nó bỏ hẳn các chữ có dấu phức tạp (ví dụ "Văn phòng phm Mu Th Cường" thay vì "phẩm Mẫu Thử"; "Dch vu" thay vì "Dịch vụ"), hoặc đọc sai dấu. Ô này được chấm là đúng chỉ khi tên khớp sau khi bỏ dấu, nên các tên bị mất chữ đều tính là sai. Gemini không khôi phục được vì chỉ thấy chữ OCR. Cách khắc phục đã có: chuẩn hóa theo danh sách nhà cung cấp đã biết bằng RapidFuzz. Thử riêng trên 12 tên OCR sai này với danh sách 6 nhà cung cấp, tên chuẩn hóa về đúng 12/12 (điểm khớp 90–100). Lưu ý danh sách chỉ có 6 tên và rất khác nhau, nên đây là điều kiện dễ; với nhà cung cấp mới chưa có trong danh sách thì kế toán vẫn phải sửa tay.
+- Thời gian 14–19 giây/ảnh trên CPU, chủ yếu do OCR.
+- Hai lần Gemini trả 503 (quá tải) khi chạy; hệ thống thử lại và vẫn xử lý xong.
+- Cơ chế tự sửa bằng phép tính (thuế = trước thuế × thuế suất; tổng = trước thuế + thuế) được đánh dấu "computed", độ tin cậy cố định 72 (vàng).
 
 ## 4. Hạn chế đã biết
 
@@ -74,3 +90,22 @@ Cặp đầu cho biết tiền xử lý ảnh có ích không; cặp giữa cho 
 - Gemini bản miễn phí có thể dùng dữ liệu gửi lên để cải thiện sản phẩm; MST, số tài khoản, số điện thoại, email được che nhưng **tên công ty không che**, nên chỉ gửi hóa đơn giả hoặc đã che tên.
 - Các ngưỡng cộng trừ điểm tin cậy chọn tay; cần xem bảng hiệu chuẩn sau khi có số liệu OCR thật.
 - Hóa đơn nhiều trang: PDF scan được OCR từng trang và ghép dòng, chưa tách riêng bảng dòng hàng.
+
+## 5. Lỗi gặp phải và cách sửa
+
+| # | Lỗi | Nguyên nhân | Cách sửa |
+|---|---|---|---|
+| 1 | Ảnh PNG/JPG chỉ đọc được ngày lập; PDF và XML đọc tốt | Quy tắc regex viết theo văn bản PDF sạch, không chịu được chữ OCR bị mất dấu, mất dấu `:`, nhầm `O/0`, `l/1` | Viết lại quy tắc trong `rules.py`: so khớp nhãn trên bản đã bỏ dấu, dấu `:` tùy chọn, sửa nhầm ký tự trong số tiền; thêm test với văn bản bị làm hỏng |
+| 2 | Số hóa đơn đọc thành `0000001` | Regex bắt nhầm "Mẫu số (Form): 1" | Thêm điều kiện loại trừ "Mẫu số", chọn ứng viên có nhiều chữ số nhất |
+| 3 | Ảnh mãi ở trạng thái "đang xử lý" khi không tải được mô hình PaddleOCR | Mỗi yêu cầu đều thử tải lại mô hình và chờ hết thời gian | Ghi nhớ lỗi tải trong 5 phút, khởi động nóng mô hình khi bật server, thêm `ocr_ready` ở `/health`, thêm trạng thái `loi_xu_ly` |
+| 4 | Sau khi sửa quy tắc, tiền thuế đọc thành `11717001717002` | Mẫu số tiền cho phép khoảng trắng nên dính số của hai dòng | Bỏ khoảng trắng khỏi mẫu số |
+| 5 | Dòng hàng "Tiền thuê phòng họp" bị nhận làm tiền thuế VAT | Sau khi bỏ dấu, "thuê" và "thuế" giống nhau | Chỉ nhận "Tiền thuế" khi theo sau là GTGT/VAT hoặc `:`; thêm test riêng |
+| 6 | Mất số hóa đơn khi OCR làm mất dấu `:` | Mẫu yêu cầu có dấu `:` | Thêm mẫu "Số" kèm 6–8 chữ số không cần `:` và mẫu "(No.)" |
+| 7 | Gemini không chạy, hệ thống âm thầm dùng regex | `.env` đặt `LLM_MODEL=gpt-4o-mini` (tên model OpenAI cho khóa Gemini); sau đó `gemini-2.5-flash` bị Google ngừng cấp cho tài khoản mới (lỗi 404) | Đổi mặc định và `.env` sang `gemini-3.8-flash`; khi Gemini lỗi, hệ thống dùng regex và ghi lý do vào danh sách cảnh báo của kết quả |
+| 8 | Ảnh thật: ngày, thuế suất, tiền thuế, tổng bị bỏ sót; tiền đọc sai 1 chữ số (310.548 thay vì 310.568; 4.192.660 thay vì 4.192.668) | OCR đọc "Ngày" thành "Ngby", "Tiền thuế" thành "Tidn thué"; quy tắc quá cứng | Dùng nhãn tiếng Anh trong ngoặc làm điểm tựa, đọc ngày theo "…tháng…năm…", so khớp mờ bằng RapidFuzz; tự sửa số tiền lệch tối đa 2 chữ số bằng phép tính (thuế = trước thuế × thuế suất; tổng = trước thuế + thuế), đánh dấu "computed", độ tin cậy cố định 72 (vàng) kèm cảnh báo |
+| 9 | Ký hiệu hóa đơn đọc thành `C26M8S` (đúng là `C26MBF`) | OCR đọc sai ký tự, Gemini chỉ thấy chữ OCR | Không sửa tự động vì đoán sai sẽ ra một ký hiệu hợp lệ nhưng sai; ô được tô đỏ (52,8) để kế toán kiểm tra |
+| 10 | Tên người bán sai ở 7/12 ảnh | OCR mất hoặc sai chữ có dấu | Chuẩn hóa theo danh sách nhà cung cấp bằng RapidFuzz (xem 3.2); chưa giải quyết được với nhà cung cấp mới |
+| 11 | Gemini trả 503 "quá tải" | Máy chủ Gemini bận | Thử lại tối đa 3 lần; nếu vẫn lỗi thì dùng quy tắc, kết quả vẫn được trả |
+| 12 | Công cụ debug/đánh giá đòi tự tạo venv ở thư mục gốc | Script dùng Python hệ thống | Thêm `tools/_venv.py` tự chạy lại bằng Python của `ai-service/venv` |
+| 13 | Script đánh giá báo "Connection refused" | Chưa bật ai-service trước khi chạy | Ghi rõ trong hướng dẫn: bật ai-service rồi mới chạy; dừng server bằng `Ctrl+C`, không dùng `Ctrl+Z` (chỉ tạm dừng, cổng vẫn bị chiếm) |
+| 14 | Một số thư viện được cài mà không thông báo | Danh sách phụ thuộc chưa được rà soát | Rà lại trên môi trường sạch và liệt kê đầy đủ trong `requirements.txt` và `SETUP.md` |
