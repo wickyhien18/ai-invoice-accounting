@@ -70,7 +70,7 @@ def generate_json(prompt: str, schema: dict | None = None) -> dict:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise LLMUnavailable("Chua dat GEMINI_API_KEY trong .env")
-    model = os.getenv("LLM_MODEL", "gemini-2.5-flash")
+    model = os.getenv("LLM_MODEL", "gemini-3.8-flash")
     if schema:
         prompt += "\n\nChi tra ve DUY NHAT mot JSON dung cau truc sau:\n" + json.dumps(schema, ensure_ascii=False)
     last: Exception | None = None
