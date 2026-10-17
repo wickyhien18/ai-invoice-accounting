@@ -9,21 +9,7 @@ def mock(data):
     return {"mock": True, "data": data}
 
 
-@router.post("/ocr", tags=["A"])        # A6
-def ocr():
-    return mock({"text": "HOA DON GIA TRI GIA TANG ...", "lines": []})
-
-
-@router.post("/extract", tags=["A"])    # A7
-def extract():
-    return mock({"fields": {"invoice_number": {"value": "0000123", "confidence": 96},
-                            "mst_seller": {"value": "0100000000", "confidence": 78},
-                            "total_amount": {"value": "1100000", "confidence": 55}}})
-
-
-@router.post("/normalize-vendor", tags=["A"])   # A8
-def normalize_vendor():
-    return mock({"canonical": "CONG TY TNHH MAU", "score": 97})
+# Goi A (/ocr, /extract, /normalize-vendor): da lam that o routers/invoice_ai.py
 
 
 @router.post("/classify-gl", tags=["B"])        # B5

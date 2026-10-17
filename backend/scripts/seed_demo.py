@@ -1,4 +1,4 @@
-"""CHI DUNG KHI PHAT TRIEN: tao 2 tai khoan demo + nap he thong tai khoan. Chay trong backend/:
+"""CHI DUNG KHI PHAT TRIEN: tao 2 tai khoan demo + nap he thong tai khoan + 12 hoa don demo (A3). Chay trong backend/:
     python scripts/seed_demo.py
 Mat khau demo chi de dev, TUYET DOI khong dung khi trien khai that."""
 import sys
@@ -11,6 +11,7 @@ from app.database import SessionLocal  # noqa: E402
 from app.models import User  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from scripts.seed_coa import main as seed_coa  # noqa: E402
+from scripts.seed_invoices import main as seed_invoices  # noqa: E402
 
 DEMO = [
     ("Ke toan vien Demo", "ktv@demo.local", "ktv12345", "KTV"),
@@ -25,6 +26,7 @@ def main() -> None:
             if db.scalar(select(User).where(User.email == email)) is None:
                 db.add(User(full_name=name, email=email, password_hash=hash_password(pw), role_name=role))
         db.commit()
+    seed_invoices()
     print("Tai khoan demo: ktv@demo.local / ktv12345 (KTV), ktt@demo.local / ktt12345 (KTT)")
 
 

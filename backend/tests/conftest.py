@@ -4,6 +4,7 @@ from pathlib import Path
 
 # DB tam bang SQLite de test khong can MySQL. Phai dat TRUOC khi import app.
 os.environ["DATABASE_URL"] = "sqlite:///./test_tmp.db"
+os.environ["UPLOAD_DIR"] = "test_uploads_tmp"  # thu muc tam cua test
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest  # noqa: E402
