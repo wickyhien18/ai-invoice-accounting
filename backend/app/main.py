@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import auth, health, mock_contract
+from app.routers import approval_po
 
 app = FastAPI(title="AI Invoice Accounting - Backend")
 app.add_middleware(
@@ -15,3 +16,4 @@ settings.upload_dir.mkdir(parents=True, exist_ok=True)
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(mock_contract.router)
+app.include_router(approval_po.router)
