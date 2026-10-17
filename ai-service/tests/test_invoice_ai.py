@@ -202,3 +202,33 @@ def test_engine_failure_is_cached(monkeypatch):
     monkeypatch.setitem(sys.modules, "paddleocr", None)            # het han -> thu lai -> import loi
     with pytest.raises(ocr.OCRUnavailable, match="Chua cai paddleocr"):
         ocr._engine()
+
+
+# ------------------------------------------------------------------ quy tac chiu loi OCR (anh nhieu)
+def _degrade(text, how):
+    from app.services.rules import fold
+    if how == "bo_dau":
+        return fold(text)
+    if how == "bo_dau_mat_hai_cham":
+        return fold(text).replace(":", " ")
+    if how == "nham_o0_l1":       # nham 0->O, 1->l trong cac so tien co dau cham
+        import re
+        return re.sub(r"\d{1,3}(?:\.\d{3})+", lambda m: m.group(0).replace("0", "O").replace("1", "l"), fold(text))
+
+
+@pytest.mark.parametrize("how", ["bo_dau", "bo_dau_mat_hai_cham", "nham_o0_l1"])
+def test_rules_survive_degraded_ocr_text(how):
+    from app.services.rules import rule_extract
+    from app.services.vendor import strip_accents
+    for lab in LABELS:
+        got = rule_extract(_degrade(pdf_ocr(lab["id"])["text"], how))
+        for f, k in MAP.items():
+            want = canonical(f, lab[k])
+            ok = strip_accents(got[f] or "").casefold() == strip_accents(want or "").casefold()
+            assert ok, (how, lab["id"], f, got[f], want)
+
+
+def test_rent_item_is_not_taken_as_vat():
+    from app.services.rules import rule_extract
+    text = "Tiền thuê phòng họp 1 171.700 171.700\nThuế suất GTGT: 5% Tiền thuế GTGT: 73.400"
+    assert rule_extract(text)["vat_amount"] == "73400"

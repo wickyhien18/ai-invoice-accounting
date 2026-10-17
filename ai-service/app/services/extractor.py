@@ -21,51 +21,12 @@ from rapidfuzz import fuzz
 from app import llm
 from app.services import masking
 from app.services.fields import FIELD_NAMES, MONEY, canonical, parse_date, parse_money, parse_rate
+from app.services.rules import rule_extract
 from app.services.vendor import normalize_key
 
 log = logging.getLogger(__name__)
 
-# --------------------------------------------------------------------------- quy tac regex
-_NUM = r"([\d][\d.,]*)"
-_MONEY_LABEL_GAP = r"[^:\d]*[:：]?\s*"
-_RULES = {
-    "invoice_series": re.compile(r"(?:Ký hiệu|Ky hieu|Serial)[^:：\d]*[:：]?\s*([0-9]?[A-Z]\d{2}[A-Z]{2,3})", re.I),
-    "invoice_number": re.compile(r"(?<![\wÀ-ỹ])(?<!mẫu )(?<!mau )(?:Số|So)(?:\s+hóa\s+đơn)?\s*(?:\([^)]*\))?\s*[:：]\s*(\d{1,8})(?!\d)", re.I),
-    "total_before_tax": re.compile(r"(?:Cộng tiền hàng|Tổng tiền chưa (?:có )?thuế|Thành tiền chưa thuế)" + _MONEY_LABEL_GAP + _NUM, re.I),
-    "vat_rate": re.compile(r"Thuế suất[^:\d]*[:：]?\s*(\d{1,2}(?:[.,]\d)?)\s*%", re.I),
-    "vat_amount": re.compile(r"Tiền thuế(?:\s*GTGT)?" + _MONEY_LABEL_GAP + _NUM, re.I),
-    "total_amount": re.compile(r"(?:Tổng cộng tiền thanh toán|Tổng tiền thanh toán|Tổng cộng thanh toán|Tổng thanh toán)" + _MONEY_LABEL_GAP + _NUM, re.I),
-}
-_MST_RE = re.compile(r"(?:Mã số thuế|MST|Tax code)[^:\d]*[:：]?\s*(\d[\d \-]{8,16}\d)", re.I)
-_DATE_RE = re.compile(r"Ngày\D{0,15}(\d{1,2})\D{1,25}?(\d{1,2})\D{1,25}?(\d{4})", re.I)
-_COMPANY_RE = re.compile(r"^(CÔNG TY|CTY|DOANH NGHIỆP|CỬA HÀNG|HỘ KINH DOANH|TẬP ĐOÀN|TỔNG CÔNG TY|CHI NHÁNH)\b", re.I)
-_SELLER_LABEL_RE = re.compile(r"Đơn vị bán hàng[^:]*:\s*(.+)", re.I)
-
-
-def rule_extract(text: str) -> dict[str, str | None]:
-    """Doc cac truong bang regex tren van ban OCR (moi dong = mot dong tren hoa don). Khong tim thay -> None."""
-    out: dict[str, str | None] = {n: None for n in FIELD_NAMES}
-    for name, rx in _RULES.items():
-        m = rx.search(text)
-        if m:
-            out[name] = canonical(name, m.group(1))
-    m = _DATE_RE.search(text)
-    if m:
-        out["invoice_date"] = canonical("invoice_date", "/".join(m.groups()))
-    else:
-        m = re.search(r"\b(\d{1,2}/\d{1,2}/\d{4})\b", text)
-        out["invoice_date"] = canonical("invoice_date", m.group(1)) if m else None
-    lines = text.split("\n")
-    mst_idx = next((i for i, ln in enumerate(lines) if _MST_RE.search(ln)), None)
-    if mst_idx is not None:
-        out["mst_seller"] = canonical("mst_seller", _MST_RE.search(lines[mst_idx]).group(1))  # MST dau tien = nguoi ban
-    m = _SELLER_LABEL_RE.search(text)
-    if m:
-        out["seller_name"] = canonical("seller_name", m.group(1))
-    elif mst_idx is not None:
-        cand = [ln.strip() for ln in lines[:mst_idx] if _COMPANY_RE.match(ln.strip())]
-        out["seller_name"] = canonical("seller_name", cand[-1]) if cand else None
-    return out
+# Quy tac regex (chiu loi OCR: mat dau, mat ':', nham O/0) nam o app/services/rules.py
 
 
 # --------------------------------------------------------------------------- LLM
