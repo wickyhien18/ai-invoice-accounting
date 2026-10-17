@@ -232,3 +232,25 @@ def test_rent_item_is_not_taken_as_vat():
     from app.services.rules import rule_extract
     text = "Tiền thuê phòng họp 1 171.700 171.700\nThuế suất GTGT: 5% Tiền thuế GTGT: 73.400"
     assert rule_extract(text)["vat_amount"] == "73400"
+
+
+# ------------------------------------------------------------------ van ban OCR THAT (anh HD001.png, PaddleOCR doc hong)
+REAL_OCR = """CONG TY CP VAN TÀI MÃU THÙ DÚNG
+LOGO Mà s5 thué (Tax code): 0487211601
+(VAT INVOCE) Ký hiłu (Serial): C26m8s
+Ngby (date) 23 tháng (monch) 06 năm (year) 2026 56 (No.): 0291609
+M& sá thué (Tax code): 0109999990
+2 Ché moay ván phong CM 3 1.152.700 3.458.100
+Cöng tién hàng (Total amount) 3.882.100
+Thué sußR GTGT (VAT rate): 8% Tidn thué GTGT (VAT amount) 310.548
+Téng tién thonh todn (Total poymont): 4.192.660"""
+
+
+def test_garbled_real_ocr_is_recovered_and_repaired():
+    r = extractor.extract_fields({"text": REAL_OCR}, use_llm=False)["fields"]
+    assert r["invoice_date"]["value"] == "2026-06-23" and r["vat_rate"]["value"] == "8"
+    assert r["total_before_tax"]["value"] == "3882100"
+    # tien thue / tong bi doc sai 1 chu so (6->4, 8->0) -> sua bang phep tinh, danh dau 'computed', do tin cay vang
+    assert (r["vat_amount"]["value"], r["vat_amount"]["source"]) == ("310568", "computed")
+    assert r["total_amount"]["value"] == "4192668" and 70 <= r["total_amount"]["confidence"] < 90
+    assert r["invoice_series"]["value"] is None          # ky hieu khong doc duoc thi de trong, khong doan

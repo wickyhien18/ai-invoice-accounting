@@ -47,14 +47,17 @@ _RX = {
     "mst": re.compile(r"(?:ma\s*so\s*thue|mst|tax\s*code)" + _GAP + _SEP + r"\s*(\d[\d \-]{8,16}\d)", re.I),
     "mst_any": re.compile(r"(?<![\d.,])(\d{10}(?:-\d{3})?)(?![\d.,])"),
     "date": re.compile(r"ngay" + r"\D{0,15}(\d{1,2})\D{1,25}?(\d{1,2})\D{1,25}?(\d{4})", re.I),
+    # 'Ngby (date) 23 thang (month) 06 nam (year) 2026': chu 'Ngay' bi doc hong nhung 'thang'/'nam' con
+    "date_tn": re.compile(r"(\d{1,2})\D{0,20}?th[a-z]ng\D{0,20}?(\d{1,2})\D{0,20}?n[a-z]m\D{0,20}?(\d{4})", re.I),
     "date_any": re.compile(r"(?<!\d)(\d{1,2}\s*[/.\-]\s*\d{1,2}\s*[/.\-]\s*\d{4})(?!\d)"),
-    "before": re.compile(r"(?:cong\s*tien\s*hang|tong\s*tien\s*chua\s*(?:co\s*)?thue|thanh\s*tien\s*chua\s*thue)"
+    "before": re.compile(r"(?:cong\s*tien\s*hang|tong\s*tien\s*chua\s*(?:co\s*)?thue|thanh\s*tien\s*chua\s*thue"
+                         r"|\(\s*total\s*amount\s*\))"
                          + _GAP + _SEP + r"\s*" + _NUM, re.I),
-    "rate": re.compile(r"thue\s*suat" + _GAP + _SEP + r"\s*(\d{1,2}(?:[.,]\d)?)\s*(%?)", re.I),
+    "rate": re.compile(r"(?:thue\s*suat|vat\s*rate)" + _GAP + _SEP + r"\s*(\d{1,2}(?:[.,]\d)?)\s*(%?)", re.I),
     # 'Tien thue' phai di kem GTGT/VAT hoac dau ':' de khong nham voi mat hang 'Tien thue (thuê) phong hop'
-    "vat": re.compile(r"tien\s*thue(?=\s*(?:gtgt|\(?\s*vat|[:：]))(?:\s*gtgt)?" + _GAP + _SEP + r"\s*" + _NUM, re.I),
+    "vat": re.compile(r"(?:tien\s*thue(?=\s*(?:gtgt|\(?\s*vat|[:：]))(?:\s*gtgt)?|\(\s*vat\s*amount\s*\))" + _GAP + _SEP + r"\s*" + _NUM, re.I),
     "total": re.compile(r"(?:tong\s*cong\s*tien\s*thanh\s*toan|tong\s*tien\s*thanh\s*toan|tong\s*cong\s*thanh\s*toan"
-                        r"|tong\s*thanh\s*toan)" + _GAP + _SEP + r"\s*" + _NUM, re.I),
+                        r"|tong\s*thanh\s*toan|\(\s*total\s*p\w{3,8}\s*\))" + _GAP + _SEP + r"\s*" + _NUM, re.I),
     "total_weak": re.compile(r"tong\s*cong" + _GAP + _SEP + r"\s*" + _NUM, re.I),
     "company": re.compile(r"^\W*(cong\s*ty|cty|doanh\s*nghiep|cua\s*hang|ho\s*kinh\s*doanh|tap\s*doan|tong\s*cong\s*ty|chi\s*nhanh)\b", re.I),
     "seller_label": re.compile(r"don\s*vi\s*ban\s*hang[^:\n]*[:：]\s*(.+)", re.I),
@@ -81,6 +84,8 @@ def rule_extract(text: str) -> dict[str, str | None]:
     # ngay lap
     m = _RX["date"].search(folded)
     if m:
+        out["invoice_date"] = canonical("invoice_date", "/".join(m.groups()))
+    elif (m := _RX["date_tn"].search(folded)):
         out["invoice_date"] = canonical("invoice_date", "/".join(m.groups()))
     else:
         m = _RX["date_any"].search(folded)
@@ -117,6 +122,8 @@ def rule_extract(text: str) -> dict[str, str | None]:
     out["vat_amount"] = canonical("vat_amount", _money(_RX["vat"], folded))
     out["total_amount"] = canonical("total_amount", _money(_RX["total"], folded) or _money(_RX["total_weak"], folded))
 
+    _fuzzy_money(flines, out)
+
     # thue suat: co dau % thi nhan; khong co % thi chi nhan 0/5/8/10 (tranh bat nham so khac)
     for m in _RX["rate"].finditer(folded):
         val = m.group(1).replace(",", ".")
@@ -124,3 +131,30 @@ def rule_extract(text: str) -> dict[str, str | None]:
             out["vat_rate"] = canonical("vat_rate", val)
             break
     return out
+
+
+# nhan -> truong; dung khi nhan bi OCR doc hong nen regex khong khop ('Tidn thue GTGT', 'Teng tien thonh todn')
+_FUZZY = (("total_amount", "tong tien thanh toan"), ("vat_amount", "tien thue gtgt"),
+          ("total_before_tax", "cong tien hang"))
+_MONEY_TOK = re.compile(r"(?<![\dA-Za-z.,])\d{1,3}(?:\.\d{3})+(?![\d])")
+
+
+def _fuzzy_money(flines: list[str], out: dict) -> None:
+    """Voi truong tien con thieu: tim dong co nhan GIONG nhan chuan (RapidFuzz) roi lay so tien cuoi dong.
+    Cac so nay co the con sai 1-2 chu so; extractor.repair_amounts() se doi chieu bang phep tinh."""
+    from rapidfuzz import fuzz
+    for name, label in _FUZZY:
+        if out.get(name) is not None:
+            continue
+        best = None
+        for ln in flines:
+            toks = list(_MONEY_TOK.finditer(ln))
+            if not toks:
+                continue
+            head = ln[: toks[-1].start()].lower()
+            head = re.sub(r"\(.*?\)", " ", head)          # bo phan tieng Anh trong ngoac
+            score = fuzz.partial_ratio(label, head)
+            if score >= 78 and (best is None or score > best[0]):
+                best = (score, toks[-1].group(0))
+        if best:
+            out[name] = canonical(name, best[1])

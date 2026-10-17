@@ -145,6 +145,35 @@ def arithmetic_ok(vals: dict[str, str | None]) -> bool | None:
     return ok
 
 
+def _close(a: str, b: str, max_diff: int = 2) -> bool:
+    """Cung do dai va khac nhau toi da `max_diff` chu so (loi OCR kieu 6->4, 8->0)."""
+    return len(a) == len(b) and a != b and sum(x != y for x, y in zip(a, b)) <= max_diff
+
+
+def repair_amounts(chosen: dict, warnings: list[str]) -> None:
+    """Neu phep tinh khong khop, thu sua so tien bi OCR doc sai 1-2 chu so bang cach tinh lai tu cac so con lai:
+    thue = truoc_thue x thue_suat; tong = truoc_thue + thue. Chi sua khi so tinh ra GAN GIONG so doc duoc
+    (tranh de de len so doc dung). Nguon duoc danh dau 'computed' va do tin cay co dinh 72 (vang)."""
+    g = lambda k: chosen[k][0]  # noqa: E731
+    if arithmetic_ok({k: g(k) for k in chosen}) is not False:
+        return
+    b, r = parse_money(g("total_before_tax")), parse_rate(g("vat_rate"))
+    if b is None or r is None:
+        return
+    for name, want in (("vat_amount", (b * r / 100).quantize(Decimal(1))), ):
+        cur = g(name)
+        if cur and _close(cur, str(want)):
+            chosen[name] = (str(want), "computed", None)
+            warnings.append(f"Da sua {name} {cur} -> {want} theo phep tinh (OCR co the doc sai chu so), can ke toan kiem tra")
+    v = parse_money(g("vat_amount"))
+    if v is not None:
+        want_t = str((b + v).quantize(Decimal(1)))
+        cur = g("total_amount")
+        if cur and _close(cur, want_t):
+            chosen["total_amount"] = (want_t, "computed", None)
+            warnings.append(f"Da sua total_amount {cur} -> {want_t} theo phep tinh, can ke toan kiem tra")
+
+
 def score_field(name: str, value: str | None, rows: list[dict], rule_value: str | None,
                 llm_conf: float | None, arith: bool | None) -> float:
     if value is None:
@@ -193,13 +222,16 @@ def extract_fields(ocr: dict, use_llm: bool = True) -> dict:
             chosen[name] = (rules[name], "rules", None)
         else:
             chosen[name] = (None, "none", None)
+    repair_amounts(chosen, warnings)
     arith = arithmetic_ok({n: v[0] for n, v in chosen.items()})
     if arith is False:
         warnings.append("Tien truoc thue + thue khac tong thanh toan hoac thue suat khong khop tien thue")
 
     fields = {}
     for name, (value, src, lconf) in chosen.items():
-        fields[name] = {"value": value, "source": src,
-                        "confidence": score_field(name, value, rows, rules[name], lconf, arith)}
+        conf = score_field(name, value, rows, rules[name], lconf, arith)
+        if src == "computed":
+            conf = 72.0                  # so tinh lai (khong co trong anh): luon o muc VANG de ke toan kiem tra
+        fields[name] = {"value": value, "source": src, "confidence": conf}
     return {"fields": fields, "source": "llm" if llm_out else "rules", "warnings": warnings,
             "ocr": {"source": ocr.get("source"), "avg_confidence": ocr.get("avg_confidence")}}
