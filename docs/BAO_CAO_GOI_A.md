@@ -59,8 +59,8 @@ Luồng một hóa đơn:
 
 | Cấu hình | Tổng ô đúng | Ảnh sạch | Ảnh nhiễu | Thời gian/ảnh |
 |---|---|---|---|---|
-| PaddleOCR + regex (có tiền xử lý) | 94/108 (87%) | | | 14,2 s |
-| PaddleOCR + Gemini (có tiền xử lý) | 97/108 (90%) | | | 19,0 s |
+| PaddleOCR + regex (có tiền xử lý) | 94/108 (87%) | 49/54 (91%) | 45/54 (83%) | 14,2 s |
+| PaddleOCR + Gemini (có tiền xử lý) | 97/108 (90%) | 49/54 (91%) | 48/54 (89%) | 19,0 s |
 | PaddleOCR + regex, không tiền xử lý | _chưa đo_ | | | |
 | PDF ép qua PaddleOCR | _chưa đo_ | | | |
 
@@ -77,7 +77,7 @@ Hiệu chuẩn độ tin cậy (ô xanh/vàng/đỏ có đúng thật không):
 Nhận xét:
 - Gemini chỉ hơn regex 3 điểm phần trăm (97 so với 94 ô đúng). Phần lớn cải thiện ở MST, thuế suất, số hóa đơn. Gemini chỉ nhận chữ do OCR đọc ra nên không sửa được lỗi OCR đã sai ký tự.
 - Ô đỏ đều sai (0% đúng) nên cảnh báo màu có tác dụng: kế toán biết phải kiểm tra. Ô xanh vẫn sai 3–6%, nên **không được bỏ bước người duyệt**.
-- Tên người bán là điểm yếu lớn nhất (5/12). Xem từng ảnh thì lỗi nằm ở OCR: nó bỏ hẳn các chữ có dấu phức tạp (ví dụ "Văn phòng phm Mu Th Cường" thay vì "phẩm Mẫu Thử"; "Dch vu" thay vì "Dịch vụ"), hoặc đọc sai dấu. Ô này được chấm là đúng chỉ khi tên khớp sau khi bỏ dấu, nên các tên bị mất chữ đều tính là sai. Gemini không khôi phục được vì chỉ thấy chữ OCR. Cách khắc phục đã có: chuẩn hóa theo danh sách nhà cung cấp đã biết bằng RapidFuzz. Thử riêng trên 12 tên OCR sai này với danh sách 6 nhà cung cấp, tên chuẩn hóa về đúng 12/12 (điểm khớp 90–100). Lưu ý danh sách chỉ có 6 tên và rất khác nhau, nên đây là điều kiện dễ; với nhà cung cấp mới chưa có trong danh sách thì kế toán vẫn phải sửa tay.
+- Tên người bán là điểm yếu lớn nhất (5/12). Xem từng ảnh thì lỗi nằm ở OCR: nó bỏ hẳn các chữ có dấu phức tạp (ví dụ "Văn phòng phm Mu Th Cường" thay vì "phẩm Mẫu Thử"; "Dch vu" thay vì "Dịch vụ"), hoặc đọc sai dấu. Ảnh "sạch" (HD004, 005, 006, 008, 010, 012) đúng tên 1/6 còn ảnh "nhiễu" (HD001, 002, 003, 007, 009, 011) đúng 4/6; tức là ở mẫu nhỏ này ảnh sạch không đọc tên tốt hơn ảnh nhiễu, nên không kết luận được ảnh nhiễu làm OCR kém đi. Ô này được chấm là đúng chỉ khi tên khớp sau khi bỏ dấu, nên các tên bị mất chữ đều tính là sai. Gemini không khôi phục được vì chỉ thấy chữ OCR. Cách khắc phục đã có: chuẩn hóa theo danh sách nhà cung cấp đã biết bằng RapidFuzz. Thử riêng trên 12 tên OCR sai này với danh sách 6 nhà cung cấp, tên chuẩn hóa về đúng 12/12 (điểm khớp 90–100). Lưu ý danh sách chỉ có 6 tên và rất khác nhau, nên đây là điều kiện dễ; với nhà cung cấp mới chưa có trong danh sách thì kế toán vẫn phải sửa tay.
 - Thời gian 14–19 giây/ảnh trên CPU, chủ yếu do OCR.
 - Hai lần Gemini trả 503 (quá tải) khi chạy; hệ thống thử lại và vẫn xử lý xong.
 - Cơ chế tự sửa bằng phép tính (thuế = trước thuế × thuế suất; tổng = trước thuế + thuế) được đánh dấu "computed", độ tin cậy cố định 72 (vàng).
