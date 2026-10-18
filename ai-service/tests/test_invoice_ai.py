@@ -22,9 +22,15 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def no_key(monkeypatch):
+def no_key(monkeypatch, tmp_path):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setattr(llm.time, "sleep", lambda s: None)
+    # mac dinh khong cache / khong gian cach / khong gioi han ngay de cac test khong anh huong nhau
+    monkeypatch.setenv("LLM_CACHE", "0")
+    monkeypatch.setenv("LLM_MIN_INTERVAL", "0")
+    monkeypatch.setenv("LLM_DAILY_LIMIT", "0")
+    monkeypatch.setenv("LLM_USAGE_FILE", str(tmp_path / "usage.json"))
+    monkeypatch.setattr(llm, "_CACHE_DIR", tmp_path)
 
 
 def pdf_ocr(id_):
@@ -59,6 +65,52 @@ def test_llm_server_errors_become_unavailable(monkeypatch):
     monkeypatch.setattr(llm, "_call_model", boom)
     with pytest.raises(llm.LLMUnavailable):
         llm.generate_json("x")
+
+
+def test_llm_cache_avoids_second_call(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_CACHE", "1")
+    calls = []
+    monkeypatch.setattr(llm, "_call_model", lambda p, m, k: calls.append(1) or '{"a": 1}')
+    assert llm.generate_json("noi dung") == {"a": 1}
+    assert llm.generate_json("noi dung") == {"a": 1}      # lan 2 lay tu cache
+    assert len(calls) == 1
+    llm.generate_json("noi dung khac")
+    assert len(calls) == 2
+
+
+def test_llm_daily_budget_stops_calls_before_429(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_DAILY_LIMIT", "2")
+    calls = []
+    monkeypatch.setattr(llm, "_call_model", lambda p, m, k: calls.append(1) or '{"a": 1}')
+    llm.generate_json("1"); llm.generate_json("2")
+    with pytest.raises(llm.LLMUnavailable, match="het 2 luot"):
+        llm.generate_json("3")
+    assert len(calls) == 2 and llm.usage()["used"] == 2
+
+
+def test_llm_failed_attempts_count_and_retries_are_limited(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    calls = []
+
+    def boom(p, m, k):
+        calls.append(1)
+        raise llm._Retryable("503")
+    monkeypatch.setattr(llm, "_call_model", boom)
+    with pytest.raises(llm.LLMUnavailable):
+        llm.generate_json("x")
+    assert len(calls) == 2 and llm.usage()["used"] == 2     # mac dinh thu toi da 2 lan, moi lan deu tinh
+
+
+def test_llm_min_interval_waits_between_calls(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_MIN_INTERVAL", "13")
+    waits = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: waits.append(s))
+    monkeypatch.setattr(llm, "_call_model", lambda p, m, k: '{"a": 1}')
+    llm.generate_json("1"); llm.generate_json("2")
+    assert len(waits) >= 1 and 0 < waits[-1] <= 13
 
 
 # ------------------------------------------------------------------ masking
