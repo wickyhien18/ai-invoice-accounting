@@ -257,7 +257,7 @@ Seed data (run inside `backend/`, MySQL must be up):
 
 ```bash
 python scripts/seed_coa.py     # load the Chart of Accounts (TT133) - safe to re-run
-python scripts/seed_demo.py    # DEV ONLY: seed_coa + 2 demo users
+alembic upgrade head    # DEV ONLY: seed_coa + 2 demo users
                                # ktv@demo.local / ktv12345 (KTV), ktt@demo.local / ktt12345 (KTT)
 ```
 
