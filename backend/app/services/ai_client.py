@@ -17,7 +17,8 @@ def extract_invoice(path: Path, filename: str) -> dict:
     """Gui file sang POST /extract. Tra ve {"fields": {ten: {"value", "confidence"}}, ...}."""
     try:
         with open(path, "rb") as f:
-            r = httpx.post(f"{settings.ai_service_url}/extract", files={"file": (filename, f)}, timeout=180)
+            r = httpx.post(f"{settings.ai_service_url}/extract", files={"file": (filename, f)},
+                           data={"job_id": path.name}, timeout=180)   # job_id = ten file da luu, de hoi tien do
     except httpx.HTTPError as e:
         raise AIServiceError(f"Khong goi duoc ai-service: {e}") from e
     if r.status_code != 200:
@@ -26,6 +27,15 @@ def extract_invoice(path: Path, filename: str) -> dict:
         return r.json()["data"]
     except (ValueError, KeyError) as e:
         raise AIServiceError("ai-service tra du lieu sai dinh dang") from e
+
+
+def get_progress(job_id: str) -> dict | None:
+    """Tien do doc tai lieu {"percent", "stage"} tu ai-service. Best-effort: loi/khong co thi tra None."""
+    try:
+        r = httpx.get(f"{settings.ai_service_url}/progress/{job_id}", timeout=3)
+        return r.json()["data"] if r.status_code == 200 else None
+    except (httpx.HTTPError, ValueError, KeyError):
+        return None
 
 
 def normalize_vendor(name: str, candidates: list[str]) -> dict | None:

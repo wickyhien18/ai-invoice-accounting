@@ -101,6 +101,17 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
     return {"data": invoice_out(inv)}
 
 
+@router.get("/{invoice_id}/progress")
+def invoice_progress(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+    """Tien do doc du lieu de giao dien ve thanh tien do. Het 'dang_xu_ly' thi percent = 100."""
+    inv = _get_or_404(db, invoice_id)
+    if inv.status != "dang_xu_ly":
+        return {"data": {"status": inv.status, "percent": 100,
+                         "stage": "Không đọc được hóa đơn" if inv.status == "loi_xu_ly" else "Hoàn tất"}}
+    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang chờ xử lý"}
+    return {"data": {"status": inv.status, **p}}
+
+
 @router.get("")
 def list_invoices(status: str | None = None, file_type: str | None = None, q: str | None = None,
                   date_from: str | None = None, date_to: str | None = None,

@@ -31,3 +31,23 @@ export async function fetchBlobUrl(path) {
   if (!res.ok) await fail(res);
   return URL.createObjectURL(await res.blob());
 }
+
+// Gui FormData va bao % da tai len (fetch khong co tien do tai len nen dung XMLHttpRequest).
+export function uploadWithProgress(path, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", path);
+    const t = getToken();
+    if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
+    xhr.onerror = () => reject(new Error("Không kết nối được máy chủ"));
+    xhr.onload = () => {
+      let body = {};
+      try { body = JSON.parse(xhr.responseText); } catch { /* khong phai JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(body);
+      const d = body.detail;
+      reject(new Error(typeof d === "string" ? d : `Lỗi ${xhr.status}`));
+    };
+    xhr.send(formData);
+  });
+}

@@ -5,6 +5,7 @@ Tra ve {"data": ...} (giu dang hop dong mock, bo co "mock").
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
+from app import progress
 from app.services import extractor, ocr, vendor
 
 router = APIRouter()
@@ -38,15 +39,30 @@ def ocr_endpoint(file: UploadFile = File(...), force_ocr: bool = Form(False), pr
 
 @router.post("/extract", tags=["A"])
 def extract_endpoint(file: UploadFile | None = File(None), text: str | None = Form(None),
-                     use_llm: bool = Form(True), force_ocr: bool = Form(False), preprocess: bool = Form(True)):
-    """Nhan file (PDF/anh) HOAC text da OCR. Tra cac truong trong yeu + do tin cay 0-100."""
+                     use_llm: bool = Form(True), force_ocr: bool = Form(False), preprocess: bool = Form(True),
+                     job_id: str | None = Form(None, max_length=100)):
+    """Nhan file (PDF/anh) HOAC text da OCR. Tra cac truong trong yeu + do tin cay 0-100.
+    job_id (tuy chon): de hoi tien do qua GET /progress/{job_id}."""
     if file is None and not text:
         raise HTTPException(422, "Can gui file hoac text")
+    progress.set_progress(job_id, 15, "Đang đọc chữ trên tài liệu")
     if file is not None:
         o = _run_ocr(file, force_ocr, preprocess)
     else:
         o = {"text": text, "lines": None, "avg_confidence": None, "source": "text"}
-    return {"data": extractor.extract_fields(o, use_llm=use_llm)}
+    progress.set_progress(job_id, 55, "Đang trích xuất các trường bằng AI")
+    result = extractor.extract_fields(o, use_llm=use_llm)
+    progress.set_progress(job_id, 95, "Đang lưu kết quả")
+    return {"data": result}
+
+
+@router.get("/progress/{job_id}", tags=["A"])
+def progress_endpoint(job_id: str):
+    """Buoc xu ly hien tai cua mot job_id: {"percent": 0-100, "stage": "..."}; chua co thi 404."""
+    p = progress.get_progress(job_id)
+    if p is None:
+        raise HTTPException(404, "Khong co tien do cho job nay")
+    return {"data": p}
 
 
 class VendorIn(BaseModel):
