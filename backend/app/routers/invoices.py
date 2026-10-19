@@ -58,7 +58,7 @@ def invoice_out(i: Invoice) -> dict:
 def _get_or_404(db: Session, invoice_id: int) -> Invoice:
     inv = db.get(Invoice, invoice_id)
     if inv is None:
-        raise HTTPException(404, "Khong tim thay hoa don")
+        raise HTTPException(404, "Không tìm thấy hóa đơn")
     return inv
 
 
@@ -72,13 +72,13 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
                    db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED:
-        raise HTTPException(415, "Chi nhan PDF, PNG, JPG hoac XML")
+        raise HTTPException(415, "Chỉ nhận PDF, PNG, JPG hoặc XML")
     file_type, magic_ok = ALLOWED[ext]
     data = file.file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
-        raise HTTPException(413, "File lon hon 10 MB")
+        raise HTTPException(413, "File lớn hơn 10 MB")
     if not data or not magic_ok(data[:16]):
-        raise HTTPException(415, "Noi dung file khong khop voi duong dan mo rong")
+        raise HTTPException(415, "Nội dung file không khớp với phần đuôi tên file")
     if file_type == "xml":  # XML sai thi tu choi luon, khong luu
         try:
             parse_invoice_xml(data)
@@ -131,7 +131,7 @@ def list_invoices(status: str | None = None, file_type: str | None = None, q: st
         if raw:
             d = parse_date(raw)
             if d is None:
-                raise HTTPException(422, f"Ngay khong hop le: {raw}")
+                raise HTTPException(422, f"Ngày không hợp lệ: {raw}")
             cond.append(Invoice.invoice_date >= d if op == "ge" else Invoice.invoice_date <= d)
     total = db.scalar(select(func.count()).select_from(Invoice).where(*cond))
     rows = db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
@@ -152,7 +152,7 @@ def get_invoice_file(invoice_id: int, db: Session = Depends(get_db), _: User = D
     base = settings.upload_dir.resolve()
     path = (base / inv.file_path).resolve()
     if base not in path.parents or not path.is_file():  # chan ../ va file mat
-        raise HTTPException(404, "Khong tim thay file")
+        raise HTTPException(404, "Không tìm thấy file gốc")
     return FileResponse(path, media_type=MEDIA.get(path.suffix.lower(), "application/octet-stream"),
                         filename=display_name(inv.file_path), content_disposition_type="inline",
                         headers={"X-Content-Type-Options": "nosniff"})
@@ -184,7 +184,7 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
     """Chay lai trich xuat khi loi_xu_ly (VD ai-service tat hoac het han muc Gemini)."""
     inv = _get_or_404(db, invoice_id)
     if inv.status not in REPROCESSABLE:
-        raise HTTPException(409, f"Hoa don dang o trang thai {inv.status}, khong the xu ly lai")
+        raise HTTPException(409, f"Hóa đơn đang ở trạng thái {inv.status}, không thể xử lý lại")
     inv.status = "dang_xu_ly"
     db.commit()
     if inv.file_type == "xml":

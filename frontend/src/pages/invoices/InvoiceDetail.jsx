@@ -72,25 +72,54 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
   );
 }
 
-function Flag({ ok, label }) {
-  const mark = ok === null ? ["?", "text-slate-500"] : ok ? ["✓", "text-green-700"] : ["✗", "text-red-700"];
-  return <li className={mark[1]}><b>{mark[0]}</b> {label}</li>;
+// Moi kiem tra co 3 trang thai, moi trang thai co cau chu rieng (khong dung chung mot cau cho ca dung lan sai):
+// ok -> xanh + dau ✓ ; loi -> do + dau ✗ + noi ro "khong/khac" ; chua ro (thieu so lieu) -> xam + dau ?
+const TONE = {
+  ok: { mark: "✓", row: "text-green-700", tag: "Đạt", tagCls: "bg-green-100 text-green-800" },
+  bad: { mark: "✗", row: "text-red-700", tag: "Không đạt", tagCls: "bg-red-100 text-red-800" },
+  unknown: { mark: "?", row: "text-slate-500", tag: "Chưa kiểm tra được", tagCls: "bg-slate-200 text-slate-700" },
+};
+
+function Check({ state, label, details = [] }) {
+  const t = TONE[state];
+  return (
+    <li className={t.row}>
+      <div className="flex items-start gap-2">
+        <b className="w-4 shrink-0 text-center">{t.mark}</b>
+        <span className="flex-1">{label}</span>
+        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${t.tagCls}`}>{t.tag}</span>
+      </div>
+      {details.map((d) => <p key={d} className="ml-6 mt-0.5 text-xs">{d}</p>)}
+    </li>
+  );
 }
 
 function CheckResult({ c }) {
+  const d = c.issue_details || { mst: [], totals: c.issues || [], duplicate: [] };
+  const mst = c.mst_valid ? "ok" : "bad";
+  const totals = c.total_matches === null ? "unknown" : c.total_matches ? "ok" : "bad";
+  const dup = c.duplicate ? "bad" : "ok";
+  const bad = [mst, totals, dup].filter((x) => x === "bad").length;
+  const unknown = [mst, totals, dup].filter((x) => x === "unknown").length;
   return (
     <section className="rounded border p-3 text-sm">
-      <h3 className="mb-2 font-medium">Kết quả kiểm tra sơ bộ</h3>
-      <ul className="mb-2 space-y-1">
-        <Flag ok={c.mst_valid} label="MST người bán đúng định dạng" />
-        <Flag ok={c.total_matches} label="Tiền trước thuế + thuế = tổng thanh toán" />
-        <Flag ok={!c.duplicate} label="Không trùng hóa đơn đã có" />
+      <h3 className="mb-1 font-medium">Kết quả kiểm tra sơ bộ</h3>
+      <p className={`mb-2 text-xs font-medium ${bad ? "text-red-700" : unknown ? "text-slate-500" : "text-green-700"}`}>
+        {bad ? `Có ${bad} mục không đạt, cần xem lại trước khi xác nhận`
+          : unknown ? "Chưa có lỗi, nhưng còn mục chưa kiểm tra được" : "Tất cả mục kiểm tra đều đạt"}
+      </p>
+      <ul className="space-y-2">
+        <Check state={mst}
+          label={mst === "ok" ? "MST người bán đúng định dạng" : "MST người bán không đúng định dạng"} details={d.mst} />
+        <Check state={totals}
+          label={totals === "ok" ? "Tổng tiền khớp: tiền trước thuế + thuế = tổng thanh toán"
+            : totals === "bad" ? "Tổng tiền không khớp" : "Chưa kiểm tra được tổng tiền"}
+          details={d.totals} />
+        <Check state={dup}
+          label={dup === "ok" ? "Không trùng hóa đơn đã có" : "Trùng với hóa đơn đã có"} details={d.duplicate} />
       </ul>
-      {c.issues.length > 0 && (
-        <ul className="list-disc space-y-1 pl-5 text-amber-800">{c.issues.map((i) => <li key={i}>{i}</li>)}</ul>
-      )}
       {c.vendor_suggestion && (
-        <p className="mt-2 text-slate-600">Gợi ý tên chuẩn: <b>{c.vendor_suggestion.canonical}</b></p>
+        <p className="mt-3 text-slate-600">Gợi ý tên chuẩn: <b>{c.vendor_suggestion.canonical}</b></p>
       )}
     </section>
   );

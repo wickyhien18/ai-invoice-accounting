@@ -34,7 +34,7 @@ def create_access_token(user: User) -> str:
 
 def get_current_user(cred: HTTPAuthorizationCredentials | None = Depends(bearer),
                      db: Session = Depends(get_db)) -> User:
-    err = HTTPException(status.HTTP_401_UNAUTHORIZED, "Chua dang nhap hoac token het han")
+    err = HTTPException(status.HTTP_401_UNAUTHORIZED, "Chưa đăng nhập hoặc phiên đã hết hạn")
     if cred is None:
         raise err
     try:
@@ -51,6 +51,6 @@ def require_role(*roles: str):
     """Dung: Depends(require_role("KTT")). Hien tai ho tro 2 vai tro: KTV, KTT."""
     def checker(user: User = Depends(get_current_user)) -> User:
         if user.role_name not in roles:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Khong du quyen")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Không đủ quyền")
         return user
     return checker

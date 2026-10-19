@@ -20,13 +20,13 @@ def extract_invoice(path: Path, filename: str) -> dict:
             r = httpx.post(f"{settings.ai_service_url}/extract", files={"file": (filename, f)},
                            data={"job_id": path.name}, timeout=180)   # job_id = ten file da luu, de hoi tien do
     except httpx.HTTPError as e:
-        raise AIServiceError(f"Khong goi duoc ai-service: {e}") from e
+        raise AIServiceError(f"Không gọi được dịch vụ AI: {e}") from e
     if r.status_code != 200:
-        raise AIServiceError(f"ai-service tra {r.status_code}: {r.text[:200]}")
+        raise AIServiceError(f"Dịch vụ AI trả lỗi {r.status_code}: {r.text[:200]}")
     try:
         return r.json()["data"]
     except (ValueError, KeyError) as e:
-        raise AIServiceError("ai-service tra du lieu sai dinh dang") from e
+        raise AIServiceError("Dịch vụ AI trả dữ liệu sai định dạng") from e
 
 
 def get_progress(job_id: str) -> dict | None:

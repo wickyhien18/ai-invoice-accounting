@@ -145,6 +145,9 @@ def arithmetic_ok(vals: dict[str, str | None]) -> bool | None:
     return ok
 
 
+_LABEL = {"vat_amount": "tiền thuế", "total_amount": "tổng thanh toán"}
+
+
 def _close(a: str, b: str, max_diff: int = 2) -> bool:
     """Cung do dai va khac nhau toi da `max_diff` chu so (loi OCR kieu 6->4, 8->0)."""
     return len(a) == len(b) and a != b and sum(x != y for x, y in zip(a, b)) <= max_diff
@@ -164,14 +167,14 @@ def repair_amounts(chosen: dict, warnings: list[str]) -> None:
         cur = g(name)
         if cur and _close(cur, str(want)):
             chosen[name] = (str(want), "computed", None)
-            warnings.append(f"Da sua {name} {cur} -> {want} theo phep tinh (OCR co the doc sai chu so), can ke toan kiem tra")
+            warnings.append(f"Đã sửa {_LABEL[name]} từ {cur} thành {want} theo phép tính (OCR có thể đọc sai chữ số), cần kế toán kiểm tra lại")
     v = parse_money(g("vat_amount"))
     if v is not None:
         want_t = str((b + v).quantize(Decimal(1)))
         cur = g("total_amount")
         if cur and _close(cur, want_t):
             chosen["total_amount"] = (want_t, "computed", None)
-            warnings.append(f"Da sua total_amount {cur} -> {want_t} theo phep tinh, can ke toan kiem tra")
+            warnings.append(f"Đã sửa {_LABEL['total_amount']} từ {cur} thành {want_t} theo phép tính, cần kế toán kiểm tra lại")
 
 
 def score_field(name: str, value: str | None, rows: list[dict], rule_value: str | None,
@@ -207,11 +210,11 @@ def extract_fields(ocr: dict, use_llm: bool = True) -> dict:
         try:
             llm_out = llm_extract(text)
         except llm.LLMUnavailable as e:
-            warnings.append(f"Khong dung duoc LLM ({e}); dung quy tac regex")
+            warnings.append(f"Không dùng được AI Gemini ({e}); đang dùng quy tắc regex thay thế")
         except llm.LLMError as e:
-            warnings.append(f"LLM tra loi khong hop le ({e}); dung quy tac regex")
+            warnings.append(f"AI Gemini trả lời không hợp lệ ({e}); đang dùng quy tắc regex thay thế")
     else:
-        warnings.append("Tat LLM; chi dung quy tac regex")
+        warnings.append("Đã tắt AI Gemini; chỉ dùng quy tắc regex")
 
     chosen: dict[str, tuple[str | None, str, float | None]] = {}  # ten -> (gia tri, nguon, do chac chan LLM)
     for name in FIELD_NAMES:
@@ -225,7 +228,7 @@ def extract_fields(ocr: dict, use_llm: bool = True) -> dict:
     repair_amounts(chosen, warnings)
     arith = arithmetic_ok({n: v[0] for n, v in chosen.items()})
     if arith is False:
-        warnings.append("Tien truoc thue + thue khac tong thanh toan hoac thue suat khong khop tien thue")
+        warnings.append("Tiền trước thuế + thuế khác tổng thanh toán, hoặc thuế suất không khớp tiền thuế")
 
     fields = {}
     for name, (value, src, lconf) in chosen.items():

@@ -42,9 +42,9 @@ def parse_invoice_xml(data: bytes) -> dict:
     try:
         root = ET.fromstring(data)
     except (ET.ParseError, DefusedXmlException, ValueError) as e:
-        raise XmlInvoiceError(f"XML khong hop le: {e}") from e
+        raise XmlInvoiceError(f"File XML không hợp lệ: {e}") from e
     if _local(root.tag) != "HDon":
-        raise XmlInvoiceError("Khong phai hoa don dien tu (thieu the goc HDon)")
+        raise XmlInvoiceError("Không phải hóa đơn điện tử (thiếu thẻ gốc HDon)")
 
     warnings: list[str] = []
     raw = {

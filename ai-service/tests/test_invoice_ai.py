@@ -85,7 +85,7 @@ def test_llm_daily_budget_stops_calls_before_429(monkeypatch):
     calls = []
     monkeypatch.setattr(llm, "_call_model", lambda p, m, k: calls.append(1) or '{"a": 1}')
     llm.generate_json("1"); llm.generate_json("2")
-    with pytest.raises(llm.LLMUnavailable, match="het 2 luot"):
+    with pytest.raises(llm.LLMUnavailable, match="hết 2 lượt"):
         llm.generate_json("3")
     assert len(calls) == 2 and llm.usage()["used"] == 2
 
@@ -148,7 +148,7 @@ def test_llm_hallucination_gets_low_confidence(monkeypatch):
     assert r["source"] == "llm"
     assert r["fields"]["mst_seller"]["confidence"] < 70
     assert r["fields"]["total_amount"]["confidence"] < 70
-    assert any("khac tong" in w for w in r["warnings"])
+    assert any("khác tổng" in w for w in r["warnings"])
 
 
 def test_llm_prompt_is_masked_and_result_restored(monkeypatch):
@@ -169,7 +169,7 @@ def test_llm_prompt_is_masked_and_result_restored(monkeypatch):
 def test_llm_down_falls_back_to_rules():
     r = extractor.extract_fields(pdf_ocr("HD002"))      # khong co GEMINI_API_KEY
     assert r["source"] == "rules"
-    assert any("LLM" in w for w in r["warnings"])
+    assert any("Gemini" in w for w in r["warnings"])
     assert r["fields"]["total_amount"]["value"] == str(LABELS[1]["tong_thanh_toan"])
 
 
@@ -306,3 +306,12 @@ def test_garbled_real_ocr_is_recovered_and_repaired():
     assert (r["vat_amount"]["value"], r["vat_amount"]["source"]) == ("310568", "computed")
     assert r["total_amount"]["value"] == "4192668" and 70 <= r["total_amount"]["confidence"] < 90
     assert r["invoice_series"]["value"] is None          # ky hieu khong doc duoc thi de trong, khong doan
+
+
+def test_extract_reports_progress_by_job_id():
+    pdf = (DATA / "pdf" / "HD001.pdf").read_bytes()
+    assert client.get("/progress/job-1").status_code == 404
+    r = client.post("/extract", files={"file": ("a.pdf", pdf)}, data={"job_id": "job-1", "use_llm": "false"})
+    assert r.status_code == 200
+    p = client.get("/progress/job-1").json()["data"]
+    assert p["percent"] == 95 and p["stage"]

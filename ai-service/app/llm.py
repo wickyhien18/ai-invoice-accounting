@@ -93,8 +93,8 @@ def _reserve_call() -> None:
         u = usage()
         if limit > 0 and u["used"] >= limit:
             raise LLMUnavailable(
-                f"Da dung het {limit} luot Gemini hom nay (LLM_DAILY_LIMIT); dung quy tac regex. "
-                "Han muc ngay cua Google thuong dat lai luc nua dem gio Thai Binh Duong (khoang 14-15h gio Viet Nam).")
+                f"Đã dùng hết {limit} lượt Gemini hôm nay (LLM_DAILY_LIMIT); chuyển sang quy tắc regex. "
+                "Hạn mức ngày của Google thường đặt lại lúc nửa đêm giờ Thái Bình Dương (khoảng 14–15h giờ Việt Nam).")
         wait = _last_call + _num("LLM_MIN_INTERVAL", 13) - time.monotonic()
         if wait > 0:
             time.sleep(wait)
@@ -144,12 +144,12 @@ def _call_model(prompt: str, model: str, api_key: str) -> str:
     except errors.APIError as e:
         code = getattr(e, "code", None)
         if code == 429:
-            raise LLMUnavailable("Het han muc Gemini (429). Doi mot luc hoac doi khoa khac.") from e
+            raise LLMUnavailable("Hết hạn mức Gemini (429). Hãy đợi một lúc hoặc đổi khóa khác.") from e
         if code in (401, 403):
-            raise LLMUnavailable(f"GEMINI_API_KEY bi tu choi ({code})") from e
+            raise LLMUnavailable(f"GEMINI_API_KEY bị từ chối ({code})") from e
         if code and code >= 500:
             raise _Retryable(str(e)) from e
-        raise LLMError(f"Gemini loi {code}: {e}") from e
+        raise LLMError(f"Gemini lỗi {code}: {e}") from e
     return resp.text or ""
 
 
@@ -159,16 +159,16 @@ def _parse(text: str) -> dict:
     try:
         data = json.loads(t)
     except json.JSONDecodeError as e:
-        raise LLMError(f"LLM khong tra JSON hop le: {t[:120]!r}") from e
+        raise LLMError(f"Gemini không trả JSON hợp lệ: {t[:120]!r}") from e
     if not isinstance(data, dict):
-        raise LLMError("LLM tra JSON khong phai object")
+        raise LLMError("Gemini trả JSON không phải đối tượng")
     return data
 
 
 def generate_json(prompt: str, schema: dict | None = None) -> dict:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise LLMUnavailable("Chua dat GEMINI_API_KEY trong .env")
+        raise LLMUnavailable("Chưa đặt GEMINI_API_KEY trong file .env")
     model = os.getenv("LLM_MODEL", "gemini-3.8-flash")
     if schema:
         prompt += "\n\nChi tra ve DUY NHAT mot JSON dung cau truc sau:\n" + json.dumps(schema, ensure_ascii=False)
@@ -189,5 +189,5 @@ def generate_json(prompt: str, schema: dict | None = None) -> dict:
             log.warning("LLM lan %d that bai: %s", attempt + 1, e)
             time.sleep(2.0 * (attempt + 1))     # 503 do qua tai: doi lau hon truoc khi thu lai
     if isinstance(last, _Retryable):
-        raise LLMUnavailable(f"May chu Gemini loi lien tiep: {last}") from last
+        raise LLMUnavailable(f"Máy chủ Gemini lỗi liên tiếp: {last}") from last
     raise last  # type: ignore[misc]
