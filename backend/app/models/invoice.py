@@ -1,6 +1,6 @@
 """Bang invoices (Goi A): hoa don. Trang thai duyet (status) va xuat (export_status) tach rieng.
 
-status: dang_xu_ly | cho_xac_nhan | cho_duyet | da_duyet | tu_choi
+status: dang_xu_ly | loi_xu_ly | cho_xac_nhan | cho_duyet | da_duyet | tu_choi
 export_status: chua_xuat | da_xuat
 """
 from datetime import date, datetime

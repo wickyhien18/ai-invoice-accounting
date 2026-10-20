@@ -22,3 +22,11 @@ Thumbs.db
 
 # Logs
 *.log
+
+ai-service/.cache
+
+eval_out
+data_test/images
+data_test/pdf
+data_test/xml
+backend/storage

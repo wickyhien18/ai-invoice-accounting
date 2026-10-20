@@ -22,6 +22,6 @@ def test_only_ktt_can_approve(client):
 
 
 def test_mock_contract_needs_login_and_flags_mock(client):
-    assert client.get("/api/invoices").status_code == 401
-    r = client.get("/api/invoices", headers=login(client, "ktv@t.local")).json()
+    assert client.get("/api/purchase-orders").status_code == 401
+    r = client.get("/api/purchase-orders", headers=login(client, "ktv@t.local")).json()
     assert r["mock"] is True

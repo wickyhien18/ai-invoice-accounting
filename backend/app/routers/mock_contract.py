@@ -27,25 +27,7 @@ def mock(data, **extra):
     return {"mock": True, "data": data, **extra}
 
 
-# ---- Goi A (Hien) ----
-@router.post("/invoices", tags=["A"])
-def upload_invoice():
-    return mock(SAMPLE_INVOICE)
-
-
-@router.get("/invoices", tags=["A"])
-def list_invoices():
-    return mock([SAMPLE_INVOICE])
-
-
-@router.get("/invoices/{invoice_id}", tags=["A"])
-def get_invoice(invoice_id: int):
-    return mock({**SAMPLE_INVOICE, "invoice_id": invoice_id})
-
-
-@router.post("/invoices/{invoice_id}/check", tags=["A"])
-def check_invoice(invoice_id: int):
-    return mock({"mst_valid": True, "total_matches": True, "duplicate": False})
+# ---- Goi A (Hien): da lam that o routers/invoices.py ----
 
 
 # ---- Goi B (Khanh) ----

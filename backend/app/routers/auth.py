@@ -24,7 +24,7 @@ def user_out(u: User) -> dict:
 def login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == body.email))
     if user is None or not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Sai email hoac mat khau")
+        raise HTTPException(401, "Sai email hoặc mật khẩu")
     return {"access_token": create_access_token(user), "token_type": "bearer", "user": user_out(user)}
 
 

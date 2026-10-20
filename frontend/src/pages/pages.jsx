@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import Placeholder from "../components/Placeholder.jsx";
 import { api } from "../api/client.js";
+import UploadPage from "./invoices/Upload.jsx";
 
-export const Upload = () => <Placeholder title="Tải hóa đơn" pkg="A" tasks="A4, A5 (tải file, danh sách, chi tiết)" />;
+export const Upload = UploadPage; // Goi A (Hien): tai hoa don + danh sach + chi tiet
 export const Review = () => <Placeholder title="Kiểm tra trường trích xuất" pkg="B" tasks="B3 (ảnh trái, trường phải, màu độ tin cậy)" />;
 export const Entries = () => <Placeholder title="Bút toán gợi ý" pkg="B" tasks="B6, B7 (gợi ý Nợ/Có, lưu bút toán)" />;
 
