@@ -14,10 +14,12 @@ export const Approvals = () => {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // State cho Form Từ chối
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  
+  // State quản lý Modal Cảnh báo
+  const [showAnomalyModal, setShowAnomalyModal] = useState(false);
 
   const fetchApprovals = () => {
     setLoading(true);
@@ -35,14 +37,12 @@ export const Approvals = () => {
     api(`/api/invoices/${id}/approve`, { method: "POST" })
       .then(() => {
         alert(`Hóa đơn ${id} đã được phê duyệt!`);
-        // Đóng form từ chối nếu đang mở trùng ID
         if (rejectingId === id) closeRejectForm(); 
         fetchApprovals();
       })
       .catch(() => alert("Lỗi khi duyệt hóa đơn. Bạn có đúng quyền Kế Toán Trưởng không?"));
   };
 
-  // Mở/Đóng form từ chối
   const openRejectForm = (id) => {
     setRejectingId(id);
     setRejectReason("");
@@ -53,7 +53,6 @@ export const Approvals = () => {
     setRejectReason("");
   };
 
-  // Gửi API từ chối
   const submitReject = (e) => {
     e.preventDefault();
     if (!rejectReason.trim()) {
@@ -77,7 +76,17 @@ export const Approvals = () => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-        <h2 className="text-lg font-bold text-slate-800">Hàng chờ duyệt</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-bold text-slate-800">Hàng chờ duyệt</h2>
+          
+          {/* NÚT XEM CẢNH BÁO */}
+          <button 
+            onClick={() => setShowAnomalyModal(true)}
+            className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-200 px-3 py-1.5 rounded text-sm font-semibold transition-colors shadow-sm"
+          >
+            Cảnh báo rủi ro ({invoices.filter(i => i.is_anomaly).length})
+          </button>
+        </div>
         {rejectingId && (
           <button 
             onClick={closeRejectForm}
@@ -88,7 +97,48 @@ export const Approvals = () => {
         )}
       </div>
 
-      {/* Form Nhập Lý Do Từ Chối (Giống thiết kế nhập PO) */}
+      {/* MODAL CẢNH BÁO RỦI RO */}
+      {showAnomalyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden border border-slate-200">
+            <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="text-lg font-bold text-red-700 flex items-center gap-2">
+                Danh sách Hóa đơn có rủi ro cao
+              </h3>
+              <button onClick={() => setShowAnomalyModal(false)} className="text-slate-400 hover:text-slate-700 text-xl font-bold">
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 max-h-[60vh] overflow-y-auto bg-slate-50/50">
+              {invoices.filter(i => i.is_anomaly).length === 0 ? (
+                <div className="text-center text-slate-500 py-8">Không có hóa đơn nào bất thường.</div>
+              ) : (
+                <ul className="space-y-4">
+                  {invoices.filter(i => i.is_anomaly).map(inv => (
+                    <li key={inv.invoice_id || inv.id} className="p-4 border border-red-200 bg-red-50 rounded-md shadow-sm">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="font-bold text-slate-800 text-base">Hóa đơn #{inv.invoice_number || inv.invoice_id || inv.id}</div>
+                        <div className="font-bold text-red-600">
+                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
+                        </div>
+                      </div>
+                      <div className="text-sm text-slate-700 mb-1">
+                        <span className="font-semibold">Nhà cung cấp:</span> {inv.seller_name || inv.vendor || "N/A"}
+                      </div>
+                      <div className="text-sm text-red-700 bg-white inline-block px-2 py-1 rounded border border-red-100 font-medium">
+                        {inv.anomaly_reason}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form Nhập Lý Do Từ Chối */}
       {rejectingId && (
         <form onSubmit={submitReject} className="p-6 bg-red-50 border-b border-red-200 flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
@@ -143,19 +193,23 @@ export const Approvals = () => {
               const isRejecting = rejectingId === currentId;
 
               return (
-                <tr key={currentId} className={isRejecting ? "bg-red-50 transition-colors" : "hover:bg-slate-50 transition-colors"}>
-                  <td className="px-6 py-4 text-sm text-slate-900">{currentId}</td>
-                  <td className="px-6 py-4 text-sm font-medium text-blue-600">{inv.invoice_number || "N/A"}</td>
+                <tr 
+                  key={currentId} 
+                  className={isRejecting ? "bg-red-100 transition-colors" : inv.is_anomaly ? "bg-red-50 hover:bg-red-100 transition-colors" : "hover:bg-slate-50 transition-colors"}
+                >
+                  <td className={`px-6 py-4 text-sm ${inv.is_anomaly ? "text-red-700 font-bold" : "text-slate-900"}`}>{currentId}</td>
+                  <td className={`px-6 py-4 text-sm font-medium ${inv.is_anomaly ? "text-red-600" : "text-blue-600"}`}>{inv.invoice_number || "N/A"}</td>
                   <td className="px-6 py-4 text-sm text-slate-500">
-                    <div className="font-medium text-slate-700">{inv.seller_name || inv.vendor || "N/A"}</div>
-                    {/* Đoạn code thêm mới cho Nhiệm vụ C5 */}
-                    {inv.is_anomaly && (
-                      <div className="mt-1 text-xs font-bold text-red-600 bg-red-50 p-1.5 rounded inline-block border border-red-200 shadow-sm">
-                        ⚠️ {inv.anomaly_reason}
-                      </div>
-                    )}
+                    <div className={`font-medium ${inv.is_anomaly ? "text-red-700" : "text-slate-700"}`}>
+                      {inv.seller_name || inv.vendor || "N/A"}
+                      {inv.is_anomaly && (
+                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white shadow-sm">
+                          ⚠️ Bất thường
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-slate-900">
+                  <td className={`px-6 py-4 text-sm font-semibold ${inv.is_anomaly ? "text-red-700" : "text-slate-900"}`}>
                     {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
                   </td>
                   <td className="px-6 py-4 text-center text-sm font-medium">
@@ -338,10 +392,9 @@ export const Export = () => {
     api("/api/exports/sheet", { method: "POST" })
       .then((res) => {
         alert(res.message);
-        // Tự động kích hoạt tải file về máy tính
         if (res.download_url) {
           const a = document.createElement("a");
-          a.href = res.download_url; // Vite proxy sẽ tự nối thành localhost:8000/api/...
+          a.href = res.download_url;
           a.download = "";
           document.body.appendChild(a);
           a.click();
