@@ -3,7 +3,7 @@ import Placeholder from "../components/Placeholder.jsx";
 import { api } from "../api/client.js";
 import UploadPage from "./invoices/Upload.jsx";
 
-export const Upload = UploadPage; // Goi A (Hien): tai hoa don + danh sach + chi tiet
+export const Upload = UploadPage;
 export const Review = () => <Placeholder title="Kiểm tra trường trích xuất" pkg="B" tasks="B3 (ảnh trái, trường phải, màu độ tin cậy)" />;
 export const Entries = () => <Placeholder title="Bút toán gợi ý" pkg="B" tasks="B6, B7 (gợi ý Nợ/Có, lưu bút toán)" />;
 
@@ -146,7 +146,15 @@ export const Approvals = () => {
                 <tr key={currentId} className={isRejecting ? "bg-red-50 transition-colors" : "hover:bg-slate-50 transition-colors"}>
                   <td className="px-6 py-4 text-sm text-slate-900">{currentId}</td>
                   <td className="px-6 py-4 text-sm font-medium text-blue-600">{inv.invoice_number || "N/A"}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">{inv.seller_name || inv.vendor || "N/A"}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">
+                    <div className="font-medium text-slate-700">{inv.seller_name || inv.vendor || "N/A"}</div>
+                    {/* Đoạn code thêm mới cho Nhiệm vụ C5 */}
+                    {inv.is_anomaly && (
+                      <div className="mt-1 text-xs font-bold text-red-600 bg-red-50 p-1.5 rounded inline-block border border-red-200 shadow-sm">
+                        ⚠️ {inv.anomaly_reason}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm font-semibold text-slate-900">
                     {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
                   </td>
