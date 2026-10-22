@@ -1,0 +1,16 @@
+{
+  "n_rows": 420,
+  "classes": [
+    "bao_gia_hop_dong",
+    "bien_lai_phieu_thu",
+    "hoa_don_ban_hang",
+    "hoa_don_gtgt",
+    "khac",
+    "phieu_giao_hang_xuat_kho"
+  ],
+  "repeats": 5,
+  "accuracy": {
+    "mean": 1.0,
+    "sd": 0.0
+  }
+}
