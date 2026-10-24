@@ -8,7 +8,7 @@ from fastapi import FastAPI
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-from app.routers import invoice_ai, mock_contract, po_matching, anomaly  # <--- Bổ sung po_matching và anomaly
+from app.routers import gl_ai, invoice_ai, mock_contract, po_matching, anomaly  # <--- Bổ sung po_matching và anomaly
 from app.services import ocr
 
 
@@ -21,6 +21,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="AI Invoice Accounting - AI Service", lifespan=lifespan)
 app.include_router(invoice_ai.router)
+app.include_router(gl_ai.router)
 app.include_router(mock_contract.router)
 app.include_router(po_matching.router)  # <--- Đăng ký router đối chiếu PO
 app.include_router(anomaly.router)

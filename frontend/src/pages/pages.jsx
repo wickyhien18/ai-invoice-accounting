@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Placeholder from "../components/Placeholder.jsx";
 import { api } from "../api/client.js";
 import UploadPage from "./invoices/Upload.jsx";
 
 export const Upload = UploadPage;
-export const Review = () => <Placeholder title="Kiểm tra trường trích xuất" pkg="B" tasks="B3 (ảnh trái, trường phải, màu độ tin cậy)" />;
-export const Entries = () => <Placeholder title="Bút toán gợi ý" pkg="B" tasks="B6, B7 (gợi ý Nợ/Có, lưu bút toán)" />;
+export { default as Review } from "./review/Review.jsx";
+export { default as Entries } from "./entries/Entries.jsx";
+export { default as Catalog } from "./catalog/Catalog.jsx";
 
 // ---------------------------------------------------------
 // Nhiệm vụ C3: Luồng duyệt & Hàng chờ duyệt

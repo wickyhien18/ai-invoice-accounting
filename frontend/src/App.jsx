@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api, getToken, setToken } from "./api/client.js";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import Login from "./pages/Login.jsx";
-import { Approvals, Entries, Export, PurchaseOrders, Review, Upload } from "./pages/pages.jsx";
+import { Approvals, Catalog, Entries, Export, PurchaseOrders, Review, Upload } from "./pages/pages.jsx";
 
 // Chu so huu khung giao dien (nav, bao ve route theo vai tro): Duong (C9)
 const NAV = [
-  ["/", "Tải hóa đơn"], ["/review", "Kiểm tra"], ["/entries", "Bút toán"],
+  ["/", "Tải hóa đơn"], ["/review", "Kiểm tra"], ["/entries", "Bút toán"], ["/catalog", "Danh mục"],
   ["/approvals", "Hàng chờ duyệt"], ["/po", "PO"], ["/export", "Xuất"],
 ];
 
@@ -48,6 +48,7 @@ export default function App() {
           <Route path="/" element={<Upload />} />
           <Route path="/review" element={<Review />} />
           <Route path="/entries" element={<Entries />} />
+          <Route path="/catalog" element={<Catalog />} />
           {/* Chi KTT vao duoc hang cho duyet */}
           <Route path="/approvals" element={user.role_name === "KTT" ? <Approvals /> : <Navigate to="/" />} />
           <Route path="/po" element={<PurchaseOrders />} />
