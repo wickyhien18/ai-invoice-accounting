@@ -34,29 +34,29 @@ function Accounts({ canEdit }) {
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm mã hoặc tên tài khoản" aria-label="Tìm tài khoản"
-          className="w-72 rounded border p-2 text-sm" />
+          className="w-72 rounded-lg border p-2.5 text-base" />
         <span className="ml-auto text-sm text-slate-500">{rows.length} tài khoản</span>
       </div>
       {err && <p role="alert" className="mb-2 rounded bg-red-50 p-2 text-sm text-red-700">{err}</p>}
       {canEdit && (
         <form className="mb-3 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); add(); }}>
           <input value={form.account_code} onChange={(e) => setForm({ ...form, account_code: e.target.value })}
-            placeholder="Mã (3–10 số)" aria-label="Mã tài khoản mới" className="w-36 rounded border p-2 text-sm" required />
+            placeholder="Mã (3–10 số)" aria-label="Mã tài khoản mới" className="w-36 rounded-lg border p-2.5 text-base" required />
           <input value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })}
-            placeholder="Tên tài khoản" aria-label="Tên tài khoản mới" className="w-72 rounded border p-2 text-sm" required />
-          <button className="rounded bg-blue-600 px-3 text-sm text-white">+ Thêm tài khoản</button>
+            placeholder="Tên tài khoản" aria-label="Tên tài khoản mới" className="w-72 rounded-lg border p-2.5 text-base" required />
+          <button className="rounded-lg bg-blue-600 px-5 py-2.5 text-base font-medium text-white shadow-sm hover:bg-blue-700">+ Thêm tài khoản</button>
         </form>
       )}
-      <div className="overflow-x-auto rounded border bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-            <tr><th className="w-32 px-3 py-2 font-medium">Mã</th><th className="px-3 py-2 font-medium">Tên tài khoản</th>{canEdit && <th className="w-40 px-3 py-2" />}</tr>
+      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+        <table className="w-full text-left text-base">
+          <thead className="bg-slate-100 text-sm uppercase tracking-wide text-slate-600">
+            <tr><th className="w-32 px-5 py-3.5 font-semibold">Mã</th><th className="px-5 py-3.5 font-semibold">Tên tài khoản</th>{canEdit && <th className="w-40 px-3 py-2" />}</tr>
           </thead>
           <tbody>
             {rows.map((a) => (
               <tr key={a.account_code} className="border-t">
-                <td className="px-3 py-1.5 font-medium tabular-nums">{a.account_code}</td>
-                <td className="px-3 py-1.5">
+                <td className="px-5 py-3 font-medium tabular-nums">{a.account_code}</td>
+                <td className="px-5 py-3">
                   {editing?.code === a.account_code ? (
                     <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); rename(); }}>
                       <input autoFocus value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })}
@@ -67,7 +67,7 @@ function Accounts({ canEdit }) {
                   ) : a.account_name}
                 </td>
                 {canEdit && (
-                  <td className="space-x-3 px-3 py-1.5 text-right">
+                  <td className="space-x-3 px-5 py-3 text-right">
                     <button className="text-blue-700" onClick={() => setEditing({ code: a.account_code, name: a.account_name })}>Sửa tên</button>
                     <button className="text-red-600" onClick={() => remove(a)}>Xóa</button>
                   </td>
@@ -108,18 +108,18 @@ function Categories({ canEdit }) {
           setForm({ category_name: "", default_debit_account: "" });
         })(); }}>
           <input value={form.category_name} onChange={(e) => setForm({ ...form, category_name: e.target.value })}
-            placeholder="Tên loại khoản mới" aria-label="Tên loại khoản mới" className="w-64 rounded border p-2 text-sm" required />
+            placeholder="Tên loại khoản mới" aria-label="Tên loại khoản mới" className="w-64 rounded-lg border p-2.5 text-base" required />
           <select value={form.default_debit_account} onChange={(e) => setForm({ ...form, default_debit_account: e.target.value })}
-            aria-label="Tài khoản Nợ mặc định" className="w-64 rounded border p-2 text-sm">
+            aria-label="Tài khoản Nợ mặc định" className="w-64 rounded-lg border p-2.5 text-base">
             <option value="">Tài khoản Nợ mặc định (tùy chọn)</option>
             {accounts.map((a) => <option key={a.account_code} value={a.account_code}>{a.account_code} – {a.account_name}</option>)}
           </select>
-          <button className="rounded bg-blue-600 px-3 text-sm text-white">+ Thêm loại khoản</button>
+          <button className="rounded-lg bg-blue-600 px-5 py-2.5 text-base font-medium text-white shadow-sm hover:bg-blue-700">+ Thêm loại khoản</button>
         </form>
       )}
-      <ul className="space-y-3">
+      <ul className="space-y-4">
         {cats.map((c) => (
-          <li key={c.category_id} className="rounded border bg-white p-3">
+          <li key={c.category_id} className="rounded-xl border bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-center gap-2">
               <b>{c.category_name}</b>
               <span className="text-sm text-slate-500">Nợ mặc định:</span>
@@ -170,15 +170,15 @@ export default function Catalog() {
   const [tab, setTab] = useState("accounts");
   const canEdit = role === "KTT";
   return (
-    <section className="max-w-5xl">
-      <h1 className="mb-1 text-xl font-semibold">Danh mục</h1>
+    <section className="mx-auto max-w-6xl py-2">
+      <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-900">Danh mục</h1>
       {role !== null && !canEdit && (
         <p className="mb-3 text-sm text-slate-600">Bạn chỉ xem được. Chỉ kế toán trưởng thêm, sửa, xóa được danh mục.</p>
       )}
-      <div className="mb-4 flex gap-2 text-sm" role="tablist">
+      <div className="mb-6 flex gap-3 text-base" role="tablist">
         {[["accounts", "Tài khoản (TT133)"], ["categories", "Loại khoản"]].map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-            className={`rounded px-3 py-1 ${tab === k ? "bg-blue-100 font-semibold text-blue-800 ring-1 ring-blue-300" : "text-blue-700 hover:bg-slate-100"}`}>
+            className={`rounded-full px-5 py-2 ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
             {label}
           </button>
         ))}

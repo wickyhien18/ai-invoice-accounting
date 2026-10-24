@@ -32,7 +32,7 @@ function AccountSelect({ value, onChange, accounts, label, disabled }) {
   const known = accounts.some((a) => a.account_code === value);
   return (
     <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border p-1.5 text-sm disabled:opacity-70">
+      className="w-full rounded-lg border p-2.5 text-base disabled:opacity-70">
       <option value="">— chọn —</option>
       {!known && value && <option value={value}>{value} (không còn trong danh mục)</option>}
       {accounts.map((a) => <option key={a.account_code} value={a.account_code}>{a.account_code} – {a.account_name}</option>)}
@@ -121,18 +121,18 @@ export default function Entries() {
   );
 
   return (
-    <section className="max-w-5xl">
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-sm">
-        <button className="text-blue-700" onClick={() => setParams({})}>← Danh sách</button>
-        <h1 className="text-lg font-semibold">Định khoản hóa đơn #{inv.invoice_id}</h1>
+    <section className="mx-auto max-w-6xl py-2">
+      <div className="mb-5 flex flex-wrap items-center gap-4 text-base">
+        <button className="text-blue-700 hover:underline" onClick={() => setParams({})}>← Danh sách</button>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Định khoản hóa đơn #{inv.invoice_id}</h1>
         <StatusBadge status={inv.status} />
-        <Link to={`/review?id=${inv.invoice_id}`} className="ml-auto text-blue-700">← Kiểm tra trường</Link>
+        <Link to={`/review?id=${inv.invoice_id}`} className="ml-auto text-blue-700 hover:underline">← Kiểm tra trường</Link>
       </div>
-      <dl className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1 rounded border bg-white p-3 text-sm md:grid-cols-4">
-        <div><dt className="text-slate-500">Người bán</dt><dd className="truncate" title={inv.seller_name}>{inv.seller_name || "—"}</dd></div>
-        <div><dt className="text-slate-500">Tiền trước thuế</dt><dd className="tabular-nums">{money(inv.total_before_tax)}</dd></div>
-        <div><dt className="text-slate-500">Thuế GTGT ({inv.vat_rate ?? "—"}%)</dt><dd className="tabular-nums">{money(inv.vat_amount)}</dd></div>
-        <div><dt className="text-slate-500">Tổng thanh toán</dt><dd className="font-medium tabular-nums">{money(inv.total_amount)}</dd></div>
+      <dl className="mb-5 grid grid-cols-2 gap-x-8 gap-y-4 rounded-xl border bg-white p-6 text-base shadow-sm md:grid-cols-4">
+        <div><dt className="text-slate-500">Người bán</dt><dd className="text-lg font-semibold leading-snug" title={inv.seller_name}>{inv.seller_name || "—"}</dd></div>
+        <div><dt className="text-slate-500">Tiền trước thuế</dt><dd className="text-lg font-semibold tabular-nums">{money(inv.total_before_tax)}</dd></div>
+        <div><dt className="text-slate-500">Thuế GTGT ({inv.vat_rate ?? "—"}%)</dt><dd className="text-lg font-semibold tabular-nums">{money(inv.vat_amount)}</dd></div>
+        <div><dt className="text-slate-500">Tổng thanh toán</dt><dd className="text-lg font-bold tabular-nums text-blue-700">{money(inv.total_amount)}</dd></div>
       </dl>
       {!editable && (
         <p className="mb-3 rounded bg-amber-50 p-2 text-sm text-amber-800">
@@ -143,33 +143,33 @@ export default function Entries() {
       {warnings.map((w) => <p key={w} className="mb-2 rounded bg-amber-50 p-2 text-sm text-amber-800">⚠ {w}</p>)}
       {busy === "suggest" && <p className="mb-3 text-sm text-slate-500">Đang gợi ý định khoản… (người bán mới có thể mất vài giây nếu phải hỏi Gemini)</p>}
 
-      <div className="overflow-x-auto rounded border bg-white">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-            <tr>{["Tài khoản Nợ", "Tài khoản Có", "Số tiền (VND)", "Nguồn gợi ý", ""].map((h) => <th key={h} className="px-3 py-2 font-medium">{h}</th>)}</tr>
+      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+        <table className="w-full text-left text-base">
+          <thead className="bg-slate-100 text-sm uppercase tracking-wide text-slate-600">
+            <tr>{["Tài khoản Nợ", "Tài khoản Có", "Số tiền (VND)", "Nguồn gợi ý", ""].map((h) => <th key={h} className="px-5 py-3.5 font-semibold">{h}</th>)}</tr>
           </thead>
           <tbody>
             {rows.map((r, i) => {
               const [label, cls] = SOURCE[r.source] || SOURCE.manual;
               return (
                 <tr key={r.key} className="border-t align-top">
-                  <td className="min-w-[14rem] px-3 py-2"><AccountSelect label={`Dòng ${i + 1}: tài khoản Nợ`} value={r.debit_account} accounts={sorted} disabled={!editable}
+                  <td className="min-w-[16rem] px-5 py-4"><AccountSelect label={`Dòng ${i + 1}: tài khoản Nợ`} value={r.debit_account} accounts={sorted} disabled={!editable}
                     onChange={(v) => patch(r.key, { debit_account: v })} /></td>
-                  <td className="min-w-[14rem] px-3 py-2"><AccountSelect label={`Dòng ${i + 1}: tài khoản Có`} value={r.credit_account} accounts={sorted} disabled={!editable}
+                  <td className="min-w-[16rem] px-5 py-4"><AccountSelect label={`Dòng ${i + 1}: tài khoản Có`} value={r.credit_account} accounts={sorted} disabled={!editable}
                     onChange={(v) => patch(r.key, { credit_account: v })} /></td>
-                  <td className="px-3 py-2">
+                  <td className="px-5 py-4">
                     <input aria-label={`Dòng ${i + 1}: số tiền`} inputMode="decimal" value={r.amount} disabled={!editable}
                       onChange={(e) => patch(r.key, { amount: e.target.value.replace(/[^\d.]/g, "") })}
-                      className="w-36 rounded border p-1.5 text-right tabular-nums disabled:opacity-70" />
+                      className="w-44 rounded-lg border p-2.5 text-right text-base tabular-nums disabled:opacity-70" />
                     {errors[i] && editable && <p role="alert" className="mt-1 max-w-[9rem] text-xs text-red-600">{errors[i]}</p>}
                   </td>
-                  <td className="max-w-[18rem] px-3 py-2">
-                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${cls}`}>{label}</span>
+                  <td className="max-w-[24rem] px-5 py-4">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${cls}`}>{label}</span>
                     {r.probability != null && <span className="ml-1 text-xs text-slate-500">chắc {Math.round(r.probability * 100)}%</span>}
                     {r.edited && r.source !== "saved" && r.source !== "manual" && <span className="ml-1 text-xs text-blue-700">đã sửa</span>}
                     {r.note && <p className="mt-1 text-xs text-slate-500">{r.note}</p>}
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-5 py-4">
                     {editable && <button className="text-red-600" aria-label={`Xóa dòng ${i + 1}`}
                       onClick={() => { setRows((rs) => rs.filter((x) => x.key !== r.key)); setDirty(true); setSaved(false); }}>Xóa</button>}
                   </td>
@@ -177,14 +177,14 @@ export default function Entries() {
               );
             })}
             {rows.length === 0 && busy === "" && (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-slate-500">Chưa có bút toán.</td></tr>
+              <tr><td colSpan={5} className="px-5 py-12 text-center text-slate-500">Chưa có bút toán.</td></tr>
             )}
           </tbody>
           <tfoot>
-            <tr className="border-t bg-slate-50">
-              <td colSpan={2} className="px-3 py-2 text-right text-slate-600">Tổng các dòng</td>
-              <td className="px-3 py-2 text-right font-medium tabular-nums">{money(total / 100)}</td>
-              <td colSpan={2} className={`px-3 py-2 text-xs ${diff === 0 ? "text-green-700" : "text-amber-700"}`}>
+            <tr className="border-t bg-slate-50 text-base">
+              <td colSpan={2} className="px-5 py-4 text-right text-slate-600">Tổng các dòng</td>
+              <td className="px-5 py-4 text-right text-lg font-bold tabular-nums">{money(total / 100)}</td>
+              <td colSpan={2} className={`px-5 py-4 text-sm font-medium ${diff === 0 ? "text-green-700" : "text-amber-700"}`}>
                 {diff == null ? "" : diff === 0 ? "✓ Khớp tổng thanh toán" : `Lệch ${money(Math.abs(diff) / 100)} so với tổng thanh toán`}
               </td>
             </tr>
@@ -192,26 +192,26 @@ export default function Entries() {
         </table>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <div className="mt-5 flex flex-wrap items-center gap-3 text-base">
         {editable && <>
           <button disabled={busy !== ""} onClick={() => { setRows((rs) => [...rs, newRow()]); setDirty(true); setSaved(false); }}
-            className="rounded border px-3 py-1 disabled:opacity-50">+ Thêm dòng</button>
+            className="rounded-lg border bg-white px-5 py-2.5 font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50">+ Thêm dòng</button>
           <button disabled={busy !== ""} onClick={() => {
             if (!dirty || window.confirm("Gợi ý lại sẽ thay các dòng đang sửa. Tiếp tục?")) suggest();
-          }} className="rounded border px-3 py-1 disabled:opacity-50">Gợi ý lại</button>
-          <button disabled={!canSave} onClick={save} className="rounded bg-blue-600 px-4 py-1 text-white disabled:opacity-50">
+          }} className="rounded-lg border bg-white px-5 py-2.5 font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50">Gợi ý lại</button>
+          <button disabled={!canSave} onClick={save} className="rounded-lg bg-blue-600 px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">
             {busy === "save" ? "Đang lưu…" : "Lưu bút toán"}
           </button>
         </>}
         {editable && saved && !dirty && (
-          <button disabled={busy !== ""} onClick={submit} className="rounded bg-green-600 px-4 py-1 text-white disabled:opacity-50">
+          <button disabled={busy !== ""} onClick={submit} className="rounded-lg bg-green-600 px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50">
             Gửi kế toán trưởng duyệt
           </button>
         )}
         {dirty && editable && <span className="text-amber-700">Có thay đổi chưa lưu</span>}
         {msg && <span role="status" className="text-green-700">{msg}</span>}
       </div>
-      <p className="mt-3 text-xs text-slate-500">
+      <p className="mt-5 text-sm leading-relaxed text-slate-500">
         Gợi ý lấy theo thứ tự: lịch sử định khoản của người bán → loại khoản khớp tên người bán → mô hình ML → Gemini (người bán mới, mô hình chưa chắc) → mặc định.
         Thuế GTGT đầu vào mặc định coi là đủ điều kiện khấu trừ (Nợ 1331). Đây là gợi ý, kế toán chịu trách nhiệm kiểm tra.
       </p>
