@@ -1,12 +1,268 @@
 ﻿import React, { useState, useEffect } from "react";
 import Placeholder from "../components/Placeholder.jsx";
-import { api } from "../api/client.js";
+import { api, fetchBlobUrl } from "../api/client.js";
 import UploadPage from "./invoices/Upload.jsx";
 
 export const Upload = UploadPage;
 export { default as Review } from "./review/Review.jsx";
 export { default as Entries } from "./entries/Entries.jsx";
 export { default as Catalog } from "./catalog/Catalog.jsx";
+
+// ---------------------------------------------------------
+// COMPONENT PHÂN TRANG DÙNG CHUNG (TÁI SỬ DỤNG CHO MỌI BẢNG)
+// ---------------------------------------------------------
+const Pagination = ({ totalItems, pageSize, currentPage, setPageSize, setCurrentPage }) => {
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  return (
+    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+        <span>Hiển thị</span>
+        <select 
+          value={pageSize} 
+          onChange={(e) => { 
+            setPageSize(Number(e.target.value)); 
+            setCurrentPage(1); 
+          }}
+          className="border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </select>
+        <span>dòng / trang</span>
+      </div>
+      
+      <div className="flex items-center gap-4 text-sm font-medium">
+        <span className="text-slate-500">
+          Hiển thị {Math.min((currentPage - 1) * pageSize + 1, totalItems)} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số {totalItems} dòng
+        </span>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Trước
+          </button>
+          <div className="px-4 py-1.5 bg-slate-200 text-slate-800 rounded font-bold">
+            Trang {currentPage} / {totalPages}
+          </div>
+          <button 
+            disabled={currentPage === totalPages || totalPages === 0} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ---------------------------------------------------------
+// CỬA SỔ ĐỐI CHIẾU NHANH DÀNH CHO KẾ TOÁN TRƯỞNG
+// ---------------------------------------------------------
+const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
+  const [inv, setInv] = useState(null);
+  const [entries, setEntries] = useState(null);
+  const [fileSrc, setFileSrc] = useState(null);
+  const [xmlText, setXmlText] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let dead = false;
+    let url = null;
+    setLoading(true);
+
+    Promise.all([
+      api(`/api/invoices/${invoiceId}`),
+      api(`/api/invoices/${invoiceId}/journal-entries`).catch(() => ({ data: [] })),
+      fetchBlobUrl(`/api/invoices/${invoiceId}/file`).catch(() => null)
+    ]).then(async ([invRes, entriesRes, blobUrl]) => {
+      if (dead) {
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+        return;
+      }
+      
+      setInv(invRes.data);
+      setEntries(entriesRes.data || []);
+      url = blobUrl;
+      
+      if (invRes.data.file_type === "xml" && blobUrl) {
+        const txt = await (await fetch(blobUrl)).text();
+        setXmlText(txt);
+      } else {
+        setFileSrc(blobUrl);
+      }
+      setLoading(false);
+    }).catch(err => {
+      console.error("Lỗi tải chi tiết:", err);
+      setLoading(false);
+    });
+
+    return () => {
+      dead = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [invoiceId]);
+
+  if (loading) return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 text-white backdrop-blur-sm">
+      <div className="flex flex-col items-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        Đang tải dữ liệu đối chiếu...
+      </div>
+    </div>
+  );
+  if (!inv) return null;
+
+  const formatMoney = (v) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(v || 0);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-slate-100 animate-in fade-in zoom-in-95 duration-200">
+      <div className="flex justify-between items-center bg-white px-6 py-3 border-b shadow-sm">
+         <div className="flex items-center gap-4">
+           <h2 className="text-xl font-bold text-slate-800">Đối chiếu nhanh: Hóa đơn #{inv.invoice_id}</h2>
+           {inv.is_anomaly && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold shadow-sm">⚠️ Rủi ro cao</span>}
+         </div>
+         <div className="flex gap-3">
+            <button onClick={() => { onApprove(inv.invoice_id); onClose(); }} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
+              ✓ Duyệt nhanh
+            </button>
+            <button onClick={() => { onClose(); onReject(inv.invoice_id); }} className="bg-red-600 hover:bg-red-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
+              ✕ Từ chối
+            </button>
+            <div className="w-px bg-slate-300 mx-1"></div>
+            <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-1.5 rounded font-medium transition-colors">
+              Đóng
+            </button>
+         </div>
+      </div>
+      
+      <div className="flex flex-1 overflow-hidden">
+         <div className="w-1/2 border-r border-slate-300 bg-slate-200 flex flex-col relative">
+            <div className="absolute top-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-2 text-sm font-semibold text-slate-700 border-b z-10 flex justify-between shadow-sm">
+              <span>📄 File gốc ({inv.file_type?.toUpperCase()})</span>
+              <span className="text-slate-500 font-normal truncate max-w-[60%]">{inv.filename}</span>
+            </div>
+            <div className="flex-1 overflow-auto pt-11 bg-white">
+              {xmlText ? <pre className="p-4 text-xs bg-white min-h-full whitespace-pre-wrap break-all">{xmlText}</pre> :
+               fileSrc && inv.file_type === "pdf" ? <iframe src={fileSrc} className="w-full h-full bg-white" title="PDF Viewer" /> :
+               fileSrc ? <img src={fileSrc} className="max-w-full m-auto block bg-white shadow-sm" alt="Invoice" /> :
+               <div className="p-4 text-slate-500 flex h-full items-center justify-center bg-white">Không tải được file gốc</div>
+              }
+            </div>
+         </div>
+
+         <div className="w-1/2 bg-white p-8 overflow-y-auto">
+            {inv.is_anomaly && (
+              <div className="mb-6 bg-red-50 border border-red-200 p-4 rounded-lg shadow-sm">
+                <h3 className="text-red-800 font-bold mb-1 flex items-center gap-2">⚠️ Cảnh báo bất thường (AI Isolation Forest)</h3>
+                <p className="text-red-700 text-sm font-medium">{inv.anomaly_reason}</p>
+              </div>
+            )}
+
+            <h3 className="font-bold text-slate-800 text-lg mb-4 border-b pb-2">Dữ liệu trích xuất</h3>
+            <div className="grid grid-cols-2 gap-y-6 gap-x-8 text-sm bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-inner">
+               <div>
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Số hóa đơn</span>
+                 <strong className="text-lg text-slate-900">{inv.invoice_number || "—"}</strong>
+               </div>
+               <div>
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Ngày lập</span>
+                 <strong className="text-lg text-slate-900">{inv.invoice_date || "—"}</strong>
+               </div>
+               
+               <div className="col-span-2">
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Người bán</span>
+                 <strong className="text-xl text-blue-700">{inv.seller_name || "—"}</strong>
+               </div>
+               <div className="col-span-2">
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Mã số thuế</span>
+                 <strong className="text-lg text-slate-900">{inv.mst_seller || "—"}</strong>
+               </div>
+               
+               <div>
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Tiền trước thuế</span>
+                 <strong className="text-lg text-slate-700">{formatMoney(inv.total_before_tax)}</strong>
+               </div>
+               <div>
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Tiền thuế VAT</span>
+                 <strong className="text-lg text-slate-700">{formatMoney(inv.vat_amount)}</strong>
+               </div>
+               
+               <div className="col-span-2 mt-2 pt-4 border-t border-slate-300">
+                 <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Tổng thanh toán</span>
+                 <strong className="text-3xl text-green-700">{formatMoney(inv.total_amount)}</strong>
+               </div>
+            </div>
+
+            <div className="mt-8">
+              <h3 className="font-bold text-slate-800 text-lg mb-4 border-b pb-2">Chi tiết Định khoản (Bút toán)</h3>
+              {entries && entries.length > 0 ? (
+                <div className="rounded-lg border border-slate-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tài khoản Nợ</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tài khoản Có</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase">Số tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white">
+                      {entries.map((e, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-800">{e.debit_account}</td>
+                          <td className="px-4 py-3 font-medium text-slate-800">{e.credit_account}</td>
+                          <td className="px-4 py-3 text-right font-medium text-blue-700 tabular-nums">{formatMoney(e.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-slate-50 border-t border-slate-200">
+                      <tr>
+                        <td colSpan="2" className="px-4 py-3 text-right text-sm font-semibold text-slate-600">Tổng cộng:</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-green-700 tabular-nums">
+                          {formatMoney(entries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm font-medium">
+                  ⚠️ Kế toán viên chưa lưu bút toán nào cho hóa đơn này! Vui lòng nhắc nhở bổ sung.
+                </div>
+              )}
+            </div>
+
+            {inv.checks && (
+               <div className="mt-8">
+                 <h3 className="font-bold text-slate-800 text-lg mb-4 border-b pb-2">Kết quả kiểm tra tự động</h3>
+                 <ul className="space-y-3 text-sm">
+                    <li className={`flex items-start gap-2 ${inv.checks.mst_valid ? 'text-green-700' : 'text-red-700'}`}>
+                      <b className="mt-0.5">{inv.checks.mst_valid ? '✓' : '✗'}</b> 
+                      <span>{inv.checks.mst_valid ? 'MST hợp lệ, đúng định dạng.' : 'MST không đúng định dạng!'}</span>
+                    </li>
+                    <li className={`flex items-start gap-2 ${inv.checks.total_matches ? 'text-green-700' : 'text-red-700'}`}>
+                      <b className="mt-0.5">{inv.checks.total_matches ? '✓' : '✗'}</b> 
+                      <span>{inv.checks.total_matches ? 'Khớp tổng tiền (Tiền trước thuế + Thuế = Tổng).' : 'Cảnh báo: Tổng tiền tính toán KHÔNG khớp!'}</span>
+                    </li>
+                    <li className={`flex items-start gap-2 ${!inv.checks.duplicate ? 'text-green-700' : 'text-red-700'}`}>
+                      <b className="mt-0.5">{!inv.checks.duplicate ? '✓' : '✗'}</b> 
+                      <span>{!inv.checks.duplicate ? 'Không phát hiện trùng lặp hóa đơn.' : 'Cảnh báo: Trùng lặp với hóa đơn đã có trong hệ thống!'}</span>
+                    </li>
+                 </ul>
+               </div>
+            )}
+         </div>
+      </div>
+    </div>
+  );
+};
 
 // ---------------------------------------------------------
 // Nhiệm vụ C3: Luồng duyệt & Hàng chờ duyệt
@@ -19,13 +275,20 @@ export const Approvals = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   
-  // State quản lý Modal Cảnh báo
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
+  const [viewingId, setViewingId] = useState(null);
+  const [highlightedId, setHighlightedId] = useState(null);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const fetchApprovals = () => {
     setLoading(true);
     api("/api/approvals")
-      .then((res) => setInvoices(res?.data || res || []))
+      .then((res) => {
+        setInvoices(res?.data || res || []);
+        setCurrentPage(1);
+      })
       .catch((err) => console.error("Lỗi tải data:", err))
       .finally(() => setLoading(false));
   };
@@ -39,6 +302,7 @@ export const Approvals = () => {
       .then(() => {
         alert(`Hóa đơn ${id} đã được phê duyệt!`);
         if (rejectingId === id) closeRejectForm(); 
+        if (viewingId === id) setViewingId(null);
         fetchApprovals();
       })
       .catch(() => alert("Lỗi khi duyệt hóa đơn. Bạn có đúng quyền Kế Toán Trưởng không?"));
@@ -66,21 +330,54 @@ export const Approvals = () => {
       .then(() => {
         alert(`Hóa đơn ${rejectingId} đã bị từ chối.`);
         closeRejectForm();
+        if (viewingId === rejectingId) setViewingId(null);
         fetchApprovals();
       })
       .catch(() => alert("Lỗi khi từ chối hóa đơn."))
       .finally(() => setSubmitting(false));
   };
 
+  const scrollToInvoice = (id) => {
+    setShowAnomalyModal(false);
+    
+    const index = invoices.findIndex(inv => (inv.invoice_id || inv.id) === id);
+    if (index !== -1) {
+      const targetPage = Math.floor(index / pageSize) + 1;
+      if (currentPage !== targetPage) {
+        setCurrentPage(targetPage);
+      }
+      
+      setTimeout(() => {
+        const rowElement = document.getElementById(`invoice-row-${id}`);
+        if (rowElement) {
+          rowElement.scrollIntoView({ behavior: "smooth", block: "center" });
+          setHighlightedId(id);
+          setTimeout(() => setHighlightedId(null), 3000);
+        }
+      }, 150);
+    }
+  };
+
+  const currentInvoices = invoices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   if (loading) return <div className="p-8 text-center text-slate-500">Đang tải dữ liệu...</div>;
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200">
+    <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 relative">
+      
+      {viewingId && (
+        <QuickReviewModal 
+          invoiceId={viewingId} 
+          onClose={() => setViewingId(null)} 
+          onApprove={handleApprove} 
+          onReject={openRejectForm} 
+        />
+      )}
+
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <h2 className="text-lg font-bold text-slate-800">Hàng chờ duyệt</h2>
           
-          {/* NÚT XEM CẢNH BÁO */}
           <button 
             onClick={() => setShowAnomalyModal(true)}
             className="flex items-center gap-2 bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-200 px-3 py-1.5 rounded text-sm font-semibold transition-colors shadow-sm"
@@ -98,7 +395,6 @@ export const Approvals = () => {
         )}
       </div>
 
-      {/* MODAL CẢNH BÁO RỦI RO */}
       {showAnomalyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden border border-slate-200">
@@ -120,8 +416,18 @@ export const Approvals = () => {
                     <li key={inv.invoice_id || inv.id} className="p-4 border border-red-200 bg-red-50 rounded-md shadow-sm">
                       <div className="flex justify-between items-start mb-2">
                         <div className="font-bold text-slate-800 text-base">Hóa đơn #{inv.invoice_number || inv.invoice_id || inv.id}</div>
-                        <div className="font-bold text-red-600">
-                          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
+                        
+                        <div className="flex items-center gap-3">
+                          <div className="font-bold text-red-600">
+                            {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
+                          </div>
+                          <button 
+                            onClick={() => scrollToInvoice(inv.invoice_id || inv.id)}
+                            className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-xs font-bold transition-colors shadow-sm flex items-center gap-1"
+                            title="Đóng cửa sổ và cuộn tới dòng hóa đơn này"
+                          >
+                            Đi tới ➔
+                          </button>
                         </div>
                       </div>
                       <div className="text-sm text-slate-700 mb-1">
@@ -139,7 +445,6 @@ export const Approvals = () => {
         </div>
       )}
 
-      {/* Form Nhập Lý Do Từ Chối */}
       {rejectingId && (
         <form onSubmit={submitReject} className="p-6 bg-red-50 border-b border-red-200 flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
@@ -178,60 +483,88 @@ export const Approvals = () => {
       {invoices.length === 0 ? (
         <div className="p-8 text-center text-slate-500">Không có hóa đơn nào đang chờ duyệt.</div>
       ) : (
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-100">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Số hóa đơn</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Nhà cung cấp</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tổng tiền</th>
-              <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Thao tác</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
-            {invoices.map((inv) => {
-              const currentId = inv.invoice_id || inv.id;
-              const isRejecting = rejectingId === currentId;
-
-              return (
-                <tr 
-                  key={currentId} 
-                  className={isRejecting ? "bg-red-100 transition-colors" : inv.is_anomaly ? "bg-red-50 hover:bg-red-100 transition-colors" : "hover:bg-slate-50 transition-colors"}
-                >
-                  <td className={`px-6 py-4 text-sm ${inv.is_anomaly ? "text-red-700 font-bold" : "text-slate-900"}`}>{currentId}</td>
-                  <td className={`px-6 py-4 text-sm font-medium ${inv.is_anomaly ? "text-red-600" : "text-blue-600"}`}>{inv.invoice_number || "N/A"}</td>
-                  <td className="px-6 py-4 text-sm text-slate-500">
-                    <div className={`font-medium ${inv.is_anomaly ? "text-red-700" : "text-slate-700"}`}>
-                      {inv.seller_name || inv.vendor || "N/A"}
-                      {inv.is_anomaly && (
-                        <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white shadow-sm">
-                          ⚠️ Bất thường
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className={`px-6 py-4 text-sm font-semibold ${inv.is_anomaly ? "text-red-700" : "text-slate-900"}`}>
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
-                  </td>
-                  <td className="px-6 py-4 text-center text-sm font-medium">
-                    <button 
-                      onClick={() => handleApprove(currentId)} 
-                      className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded mr-2 shadow-sm transition-all"
-                    >
-                      Duyệt
-                    </button>
-                    <button 
-                      onClick={() => openRejectForm(currentId)} 
-                      className={`px-3 py-1.5 rounded shadow-sm transition-all ${isRejecting ? "bg-red-800 text-white" : "text-white bg-red-600 hover:bg-red-700"}`}
-                    >
-                      Từ chối
-                    </button>
-                  </td>
+        <div className="flex flex-col">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Số hóa đơn</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Nhà cung cấp</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tổng tiền</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Thao tác</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {currentInvoices.map((inv) => {
+                  const currentId = inv.invoice_id || inv.id;
+                  const isRejecting = rejectingId === currentId;
+                  const isHighlighted = highlightedId === currentId;
+
+                  return (
+                    <tr 
+                      id={`invoice-row-${currentId}`}
+                      key={currentId} 
+                      className={`
+                        ${isHighlighted ? "bg-blue-50 ring-2 ring-blue-400 ring-inset shadow-inner transition-all duration-300" : 
+                          isRejecting ? "bg-red-100 transition-colors" : 
+                          inv.is_anomaly ? "bg-red-50 hover:bg-red-100 transition-colors" : 
+                          "hover:bg-slate-50 transition-colors"}
+                      `}
+                    >
+                      <td className={`px-6 py-4 text-sm ${inv.is_anomaly ? "text-red-700 font-bold" : "text-slate-900"}`}>{currentId}</td>
+                      <td className={`px-6 py-4 text-sm font-medium ${inv.is_anomaly ? "text-red-600" : "text-blue-600"}`}>{inv.invoice_number || "N/A"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-500">
+                        <div className={`font-medium ${inv.is_anomaly ? "text-red-700" : "text-slate-700"}`}>
+                          {inv.seller_name || inv.vendor || "N/A"}
+                          {inv.is_anomaly && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white shadow-sm">
+                              ⚠️ Bất thường
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`px-6 py-4 text-sm font-semibold ${inv.is_anomaly ? "text-red-700" : "text-slate-900"}`}>
+                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}
+                      </td>
+                      
+                      <td className="px-6 py-4 text-center text-sm font-medium whitespace-nowrap">
+                        <button 
+                          onClick={() => setViewingId(currentId)} 
+                          className="text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-3 py-1.5 rounded mr-2 shadow-sm transition-all"
+                          title="Mở ảnh gốc để đối chiếu"
+                        >
+                          👁️ Kiểm tra
+                        </button>
+                        <button 
+                          onClick={() => handleApprove(currentId)} 
+                          className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded mr-2 shadow-sm transition-all"
+                        >
+                          Duyệt
+                        </button>
+                        <button 
+                          onClick={() => openRejectForm(currentId)} 
+                          className={`px-3 py-1.5 rounded shadow-sm transition-all ${isRejecting ? "bg-red-800 text-white" : "text-white bg-red-600 hover:bg-red-700"}`}
+                        >
+                          Từ chối
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* TÍCH HỢP COMPONENT PHÂN TRANG */}
+          <Pagination 
+            totalItems={invoices.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            setPageSize={setPageSize}
+            setCurrentPage={setCurrentPage}
+          />
+        </div>
       )}
     </div>
   );
@@ -249,10 +582,17 @@ export const PurchaseOrders = () => {
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("");
 
+  // State cho Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const fetchPOs = () => {
     setLoading(true);
     api("/api/purchase-orders")
-      .then((res) => setPos(res?.data || res || []))
+      .then((res) => {
+        setPos(res?.data || res || []);
+        setCurrentPage(1);
+      })
       .catch((err) => console.error("Lỗi tải data PO:", err))
       .finally(() => setLoading(false));
   };
@@ -286,6 +626,9 @@ export const PurchaseOrders = () => {
       })
       .catch((err) => alert("Lỗi: " + (err.message || "Không thể tạo PO")));
   };
+
+  // Tính toán dữ liệu hiện tại cho trang PO
+  const currentPOs = pos.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Đang tải dữ liệu Đơn mua hàng...</div>;
 
@@ -347,36 +690,49 @@ export const PurchaseOrders = () => {
       {pos.length === 0 ? (
         <div className="p-8 text-center text-slate-500">Chưa có Đơn mua hàng nào trong hệ thống.</div>
       ) : (
-        <table className="min-w-full divide-y divide-slate-200">
-          <thead className="bg-slate-100">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Mã PO</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Nhà cung cấp</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Ngày đặt</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tổng tiền dự kiến</th>
-              <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 bg-white">
-            {pos.map((po) => (
-              <tr key={po.po_id || po.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-sm text-slate-900">{po.po_id || po.id}</td>
-                <td className="px-6 py-4 text-sm font-medium text-blue-600">{po.po_number}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{po.vendor}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{po.order_date}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-slate-900">
-                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(po.expected_amount || 0)}
-                </td>
-                <td className="px-6 py-4 text-center text-sm">
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
-                    {po.status === 'dang_mo' ? 'Đang mở' : po.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="flex flex-col">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-100">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Mã PO</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Nhà cung cấp</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Ngày đặt</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase">Tổng tiền dự kiến</th>
+                  <th className="px-6 py-3 text-center text-xs font-semibold text-slate-600 uppercase">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {currentPOs.map((po) => (
+                  <tr key={po.po_id || po.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4 text-sm text-slate-900">{po.po_id || po.id}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{po.po_number}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{po.vendor}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{po.order_date}</td>
+                    <td className="px-6 py-4 text-sm font-semibold text-slate-900">
+                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(po.expected_amount || 0)}
+                    </td>
+                    <td className="px-6 py-4 text-center text-sm">
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                        {po.status === 'dang_mo' ? 'Đang mở' : po.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* TÍCH HỢP COMPONENT PHÂN TRANG VÀO ĐÂY */}
+          <Pagination 
+            totalItems={pos.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            setPageSize={setPageSize}
+            setCurrentPage={setCurrentPage}
+          />
+        </div>
       )}
     </div>
   );
