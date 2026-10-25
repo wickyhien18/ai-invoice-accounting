@@ -29,11 +29,11 @@ export default function InvoicePicker({ title, hint }) {
   const shown = (rows || []).filter((r) => !cur[2] || r.status === cur[2]);
 
   return (
-    <section className="mx-auto max-w-6xl py-2">
-      <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
-      <p className="mb-6 text-base text-slate-600">{hint}</p>
+    <section className="mx-auto max-w-6xl">
+      <h2 className="mb-2 text-2xl font-bold text-slate-800">{title}</h2>
+      <p className="mb-4 text-sm text-slate-600">{hint}</p>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 text-base" role="tablist">
+      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm" role="tablist">
         {TABS.map(([k, label, st]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
             className={`rounded-full px-5 py-2 ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
@@ -42,34 +42,34 @@ export default function InvoicePicker({ title, hint }) {
         ))}
       </div>
 
-      {err && <p className="mb-3 text-base text-red-600">{err}</p>}
-      <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-        <table className="w-full text-left text-base">
-          <thead className="bg-slate-100 text-sm uppercase tracking-wide text-slate-600">
+      {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow">
+        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+          <thead className="bg-slate-100 text-xs uppercase text-slate-600">
             <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
-              <th key={h} className="px-5 py-3.5 font-semibold">{h}</th>))}</tr>
+              <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-200">
             {shown.map((r) => (
               <tr key={r.invoice_id} className="cursor-pointer border-t transition-colors hover:bg-blue-50" onClick={() => open(r.invoice_id)}>
-                <td className="px-5 py-4 text-slate-500">{r.invoice_id}</td>
-                <td className="px-5 py-4 font-medium">{r.invoice_number || "—"}</td>
-                <td className="px-5 py-4">{dateVN(r.invoice_date)}</td>
-                <td className="max-w-[24rem] truncate px-5 py-4 font-medium" title={r.seller_name}>{r.seller_name || "—"}</td>
-                <td className="px-5 py-4 text-right font-medium tabular-nums">{money(r.total_amount)}</td>
-                <td className="px-5 py-4"><StatusBadge status={r.status} /></td>
-                <td className="px-5 py-4 text-right">
+                <td className="px-6 py-4 text-slate-500">{r.invoice_id}</td>
+                <td className="px-6 py-4 font-medium">{r.invoice_number || "—"}</td>
+                <td className="px-6 py-4">{dateVN(r.invoice_date)}</td>
+                <td className="max-w-[24rem] truncate px-6 py-4 font-medium" title={r.seller_name}>{r.seller_name || "—"}</td>
+                <td className="px-6 py-4 text-right font-medium tabular-nums">{money(r.total_amount)}</td>
+                <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
+                <td className="px-6 py-4 text-right">
                   <button onClick={(e) => { e.stopPropagation(); open(r.invoice_id); }}
-                    className="rounded-lg bg-blue-600 px-5 py-2 font-medium text-white shadow-sm hover:bg-blue-700">Mở</button>
+                    className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700">Mở</button>
                 </td>
               </tr>
             ))}
             {rows && shown.length === 0 && (
-              <tr><td colSpan={7} className="px-5 py-14 text-center text-base text-slate-500">
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
                 {tab === "all" ? "Chưa có hóa đơn nào." : `Không có hóa đơn nào ở mục “${cur[1]}”.`}
               </td></tr>
             )}
-            {!rows && !err && <tr><td colSpan={7} className="px-5 py-14 text-center text-base text-slate-500">Đang tải…</td></tr>}
+            {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
           </tbody>
         </table>
       </div>

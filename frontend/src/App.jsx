@@ -7,7 +7,7 @@ import { Approvals, Catalog, Entries, Export, PurchaseOrders, Review, Upload } f
 
 // Chu so huu khung giao dien (nav, bao ve route theo vai tro): Duong (C9)
 const NAV = [
-  ["/", "Tải hóa đơn"], ["/review", "Kiểm tra"], ["/entries", "Bút toán"], ["/catalog", "Danh mục"],
+  ["/", "Tải hóa đơn"], ["/review", "Kiểm tra"], ["/catalog", "Danh mục"],
   ["/approvals", "Hàng chờ duyệt"], ["/po", "PO"], ["/export", "Xuất"],
 ];
 
@@ -38,7 +38,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-50">
       <nav className="flex flex-wrap items-center gap-2 border-b bg-white px-6 py-3 text-sm">
         <b>AI Invoice</b>
-        {NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className={linkClass}>{label}</NavLink>)}
+        {NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => linkClass({ isActive: isActive || (to === "/review" && pathname.startsWith("/entries")) })}>{label}</NavLink>)}
         <span className="ml-auto text-slate-600">{user.full_name} ({user.role_name})</span>
         <ThemeToggle />
         <button className="text-red-600" onClick={() => { setToken(null); setUser(null); }}>Đăng xuất</button>
