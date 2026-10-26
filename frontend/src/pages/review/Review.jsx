@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom"; // Thêm useNavigate
 import { api, fetchBlobUrl } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { FILE_TYPE } from "../invoices/format.js";
@@ -31,7 +31,6 @@ function Viewer({ invoiceId, fileType, frozen }) {
   const [text, setText] = useState(null);
   const [err, setErr] = useState("");
   
-  // QoL 2: Thêm tính năng Zoom nâng cao và Xoay ảnh
   const [zoom, setZoom] = useState(1);
   const [rotate, setRotate] = useState(0);
 
@@ -55,7 +54,6 @@ function Viewer({ invoiceId, fileType, frozen }) {
   }
   return (
     <div className="flex h-full flex-col">
-      {/* QoL 2: Toolbar giao diện mới */}
       <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-3 py-2 text-sm shadow-sm z-10">
         <div className="flex items-center bg-white border rounded shadow-sm">
           <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-r" onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.25).toFixed(2)))} aria-label="Thu nhỏ">−</button>
@@ -63,15 +61,9 @@ function Viewer({ invoiceId, fileType, frozen }) {
           <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-l" onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))} aria-label="Phóng to">+</button>
         </div>
         <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm" onClick={() => {setZoom(1); setRotate(0);}}>Vừa khung</button>
-        
         <div className="w-px h-5 bg-slate-300 mx-1"></div>
-        
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r - 90)}>
-          ↺ Xoay trái
-        </button>
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r + 90)}>
-          ↻ Xoay phải
-        </button>
+        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r - 90)}>↺ Xoay trái</button>
+        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r + 90)}>↻ Xoay phải</button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-slate-200 relative">
         <div className="flex min-h-full items-center justify-center p-4">
@@ -92,8 +84,6 @@ function FieldRow({ f, editable, onSave }) {
 
   const dirty = draft.trim() !== (f.value ?? "");
   const lv = LEVEL[f.confidence_level];
-  
-  // Ép viết hoa với những trường thông tin tên, mã số, ký hiệu để chống lỗi font
   const isUpper = ["seller_name", "invoice_series", "mst_seller"].includes(f.field_name);
 
   async function commit(val) {
@@ -105,8 +95,7 @@ function FieldRow({ f, editable, onSave }) {
     <li className={`border-l-4 ${lv.bar} rounded border bg-white p-3 shadow-sm hover:shadow transition-shadow`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <label htmlFor={id} className="text-sm font-bold text-slate-700">{LABEL[f.field_name] || f.field_name}</label>
-        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${lv.chip}`}
-          title="Xanh ≥ 90, vàng 70 đến dưới 90, đỏ dưới 70">
+        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${lv.chip}`} title="Xanh ≥ 90, vàng 70 đến dưới 90, đỏ dưới 70">
           Độ tin cậy {lv.text}{f.confidence_score == null ? "" : ` · ${Math.round(f.confidence_score)}%`}
         </span>
         {f.edited && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 font-medium">Đã sửa</span>}
@@ -159,6 +148,7 @@ function Checks({ c }) {
 export default function Review() {
   const [params, setParams] = useSearchParams();
   const id = params.get("id");
+  const navigate = useNavigate(); // Sử dụng hook điều hướng
   const [info, setInfo] = useState(null);
   const [err, setErr] = useState("");
   const [split, setSplit] = useState(loadSplit);
@@ -195,7 +185,18 @@ export default function Review() {
   if (!info) return <div className="p-8 text-center text-slate-500 font-medium">Đang tải dữ liệu hóa đơn...</div>;
 
   const { inv, fields, editable, checks } = info;
+  // Tính toán số trường chưa được xác nhận
   const todo = fields.filter((f) => f.confidence_level !== "green" && !f.confirmed).length;
+
+  // Xử lý logic chặn khi bấm "Tiếp: Định khoản"
+  const handleNextStep = () => {
+    if (todo > 0) {
+      alert(`CẢNH BÁO: Vẫn còn ${todo} trường dữ liệu chưa được xác nhận!\n\nVui lòng bấm "✓ Đúng" hoặc tự gõ sửa lại các trường bị cảnh báo (vàng/đỏ) trước khi chuyển sang bước Định khoản.`);
+    } else {
+      navigate(`/entries?id=${inv.invoice_id}`);
+    }
+  };
+
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
@@ -204,7 +205,14 @@ export default function Review() {
         <h1 className="text-xl font-bold text-slate-800">Hóa đơn #{inv.invoice_id}</h1>
         <StatusBadge status={inv.status} />
         <span className="text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
-        <Link to={`/entries?id=${inv.invoice_id}`} className="ml-auto rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-white font-medium shadow-sm transition-colors">Tiếp: Định khoản →</Link>
+        
+        {/* Đổi thẻ Link thành Button có xử lý logic chặn */}
+        <button 
+          onClick={handleNextStep}
+          className={`ml-auto rounded-lg px-4 py-1.5 font-medium shadow-sm transition-colors ${todo > 0 ? 'bg-slate-400 text-white cursor-not-allowed hover:bg-slate-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+        >
+          Tiếp: Định khoản →
+        </button>
       </div>
       {!editable && (
         <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 font-medium flex items-center gap-2">

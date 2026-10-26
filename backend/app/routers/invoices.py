@@ -193,3 +193,31 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
     else:
         background.add_task(_process_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}
+
+@router.delete("/{invoice_id}")
+async def delete_invoice(invoice_id: int, db: Session = Depends(get_db)):
+    # Tìm hóa đơn theo ID (hỗ trợ cả kiểu int hoặc string tùy database)
+    invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        # Thử tìm theo cột id nếu bảng dùng khóa chính tên là id
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
+    
+    try:
+        # Nếu model Invoice có cấu hình cascade delete thì chỉ cần db.delete(invoice)
+        # Nếu không, ta xóa các bảng con liên quan bằng cách an toàn không cần gọi trực tiếp tên class lạ:
+        for attr in ["journal_entries", "fields", "extracted_fields"]:
+            if hasattr(invoice, attr):
+                related_items = getattr(invoice, attr)
+                if related_items:
+                    for item in related_items:
+                        db.delete(item)
+        
+        db.delete(invoice)
+        db.commit()
+        return {"message": "Xóa hóa đơn thành công", "invoice_id": invoice_id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi database: {str(e)}")
