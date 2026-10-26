@@ -52,6 +52,10 @@ export default {
         ".dark *, .dark ::before, .dark ::after": { borderColor: "rgb(var(--c-slate-200))" },
         // `bg-white` la be mat (the, thanh dieu huong, o nhap) nen dung mau nen toi; `text-white` van giu trang
         '.dark [class~="bg-white"]': { backgroundColor: "rgb(var(--c-slate-100))" },
+        // bien the trong suot (bg-white/90, bg-white/80...) cung la be mat: neu bo sot thi nen van trang trong khi chu da dao sang -> khong doc duoc
+        ...Object.fromEntries(Array.from({ length: 19 }, (_, i) => (i + 1) * 5).map((a) => [
+          `.dark [class~="bg-white/${a}"]`, { backgroundColor: `rgb(var(--c-slate-100) / ${a / 100})` },
+        ])),
       });
     }),
   ],
