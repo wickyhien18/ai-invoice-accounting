@@ -130,7 +130,8 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
            {inv.is_anomaly && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold shadow-sm">⚠️ Rủi ro cao</span>}
          </div>
          <div className="flex gap-3">
-            <button onClick={() => { onApprove(inv.invoice_id); onClose(); }} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
+            {/* FIX UX: Bỏ hàm onClose() ở đây để modal không biến mất khi pop-up xác nhận hiện lên */}
+            <button onClick={() => onApprove(inv.invoice_id)} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
               ✓ Duyệt nhanh
             </button>
             <button onClick={() => { onClose(); onReject(inv.invoice_id); }} className="bg-red-600 hover:bg-red-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
@@ -179,7 +180,7 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
                
                <div className="col-span-2">
                  <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Người bán</span>
-                 <strong className="text-xl text-blue-700">{inv.seller_name || "—"}</strong>
+                 <strong className="text-xl text-blue-700 uppercase font-bold tracking-wide">{inv.seller_name || "—"}</strong>
                </div>
                <div className="col-span-2">
                  <span className="block text-slate-500 text-xs uppercase font-semibold mb-1">Mã số thuế</span>
@@ -275,6 +276,9 @@ export const Approvals = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   
+  // State lưu hóa đơn đang được chọn để xác nhận Duyệt 2 Lần
+  const [confirmApproveId, setConfirmApproveId] = useState(null);
+  
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
   const [viewingId, setViewingId] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
@@ -297,15 +301,25 @@ export const Approvals = () => {
     fetchApprovals();
   }, []);
 
-  const handleApprove = (id) => {
-    api(`/api/invoices/${id}/approve`, { method: "POST" })
+  // Gọi Pop-up Xác nhận Duyệt
+  const handleConfirmApprove = (id) => {
+    setConfirmApproveId(id);
+  };
+
+  // Thực thi Duyệt Chính Thức sau khi Đồng ý
+  const executeApprove = () => {
+    if (!confirmApproveId) return;
+    setSubmitting(true);
+    api(`/api/invoices/${confirmApproveId}/approve`, { method: "POST" })
       .then(() => {
-        alert(`Hóa đơn ${id} đã được phê duyệt!`);
-        if (rejectingId === id) closeRejectForm(); 
-        if (viewingId === id) setViewingId(null);
+        alert(`Hóa đơn ${confirmApproveId} đã được phê duyệt!`);
+        if (rejectingId === confirmApproveId) closeRejectForm(); 
+        if (viewingId === confirmApproveId) setViewingId(null);
+        setConfirmApproveId(null); // Đóng pop-up
         fetchApprovals();
       })
-      .catch(() => alert("Lỗi khi duyệt hóa đơn. Bạn có đúng quyền Kế Toán Trưởng không?"));
+      .catch(() => alert("Lỗi khi duyệt hóa đơn. Bạn có đúng quyền Kế Toán Trưởng không?"))
+      .finally(() => setSubmitting(false));
   };
 
   const openRejectForm = (id) => {
@@ -365,11 +379,43 @@ export const Approvals = () => {
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 relative">
       
+      {/* CỬA SỔ POP-UP XÁC NHẬN DUYỆT HÓA ĐƠN (Z-INDEX CAO NHẤT 70) */}
+      {confirmApproveId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-green-50 shadow-inner">
+                <span className="text-3xl font-bold text-green-600">✓</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận phê duyệt</h3>
+              <p className="text-slate-600 mb-8 leading-relaxed text-sm">
+                Bạn có chắc chắn muốn duyệt Hóa đơn <b className="text-slate-900">#{confirmApproveId}</b> không? Dữ liệu sẽ chính thức được ghi nhận.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button 
+                  disabled={submitting}
+                  onClick={() => setConfirmApproveId(null)} 
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors w-1/2">
+                  Hủy bỏ
+                </button>
+                <button 
+                  disabled={submitting}
+                  onClick={executeApprove} 
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2 flex justify-center items-center">
+                  {submitting ? "Đang xử lý..." : "Đồng ý Duyệt"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CỬA SỔ ĐỐI CHIẾU NHANH (Z-INDEX 60) */}
       {viewingId && (
         <QuickReviewModal 
           invoiceId={viewingId} 
           onClose={() => setViewingId(null)} 
-          onApprove={handleApprove} 
+          onApprove={handleConfirmApprove} 
           onReject={openRejectForm} 
         />
       )}
@@ -515,7 +561,7 @@ export const Approvals = () => {
                       <td className={`px-6 py-4 text-sm ${inv.is_anomaly ? "text-red-700 font-bold" : "text-slate-900"}`}>{currentId}</td>
                       <td className={`px-6 py-4 text-sm font-medium ${inv.is_anomaly ? "text-red-600" : "text-blue-600"}`}>{inv.invoice_number || "N/A"}</td>
                       <td className="px-6 py-4 text-sm text-slate-500">
-                        <div className={`font-medium ${inv.is_anomaly ? "text-red-700" : "text-slate-700"}`}>
+                        <div className={`font-medium uppercase tracking-wide ${inv.is_anomaly ? "text-red-700" : "text-slate-700"}`}>
                           {inv.seller_name || inv.vendor || "N/A"}
                           {inv.is_anomaly && (
                             <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold bg-red-600 text-white shadow-sm">
@@ -537,7 +583,7 @@ export const Approvals = () => {
                           👁️ Kiểm tra
                         </button>
                         <button 
-                          onClick={() => handleApprove(currentId)} 
+                          onClick={() => handleConfirmApprove(currentId)} 
                           className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded mr-2 shadow-sm transition-all"
                         >
                           Duyệt
@@ -556,7 +602,6 @@ export const Approvals = () => {
             </table>
           </div>
           
-          {/* TÍCH HỢP COMPONENT PHÂN TRANG */}
           <Pagination 
             totalItems={invoices.length}
             pageSize={pageSize}
@@ -582,7 +627,6 @@ export const PurchaseOrders = () => {
   const [vendor, setVendor] = useState("");
   const [amount, setAmount] = useState("");
 
-  // State cho Phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -627,7 +671,6 @@ export const PurchaseOrders = () => {
       .catch((err) => alert("Lỗi: " + (err.message || "Không thể tạo PO")));
   };
 
-  // Tính toán dữ liệu hiện tại cho trang PO
   const currentPOs = pos.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Đang tải dữ liệu Đơn mua hàng...</div>;
@@ -724,7 +767,6 @@ export const PurchaseOrders = () => {
             </table>
           </div>
           
-          {/* TÍCH HỢP COMPONENT PHÂN TRANG VÀO ĐÂY */}
           <Pagination 
             totalItems={pos.length}
             pageSize={pageSize}

@@ -4,6 +4,60 @@ import { api } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { dateVN, money } from "../invoices/format.js";
 
+// ---------------------------------------------------------
+// COMPONENT PHÂN TRANG DÙNG CHUNG
+// ---------------------------------------------------------
+const Pagination = ({ totalItems, pageSize, currentPage, setPageSize, setCurrentPage }) => {
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  return (
+    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+        <span>Hiển thị</span>
+        <select 
+          value={pageSize} 
+          onChange={(e) => { 
+            setPageSize(Number(e.target.value)); 
+            setCurrentPage(1); 
+          }}
+          className="border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </select>
+        <span>dòng / trang</span>
+      </div>
+      
+      <div className="flex items-center gap-4 text-sm font-medium">
+        <span className="text-slate-500">
+          Hiển thị {Math.min((currentPage - 1) * pageSize + 1, totalItems)} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số {totalItems} dòng
+        </span>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Trước
+          </button>
+          <div className="px-4 py-1.5 bg-slate-200 text-slate-800 rounded font-bold">
+            Trang {currentPage} / {totalPages}
+          </div>
+          <button 
+            disabled={currentPage === totalPages || totalPages === 0} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Chon hoa don de lam viec (dung chung cho man hinh Kiem tra va Dinh khoan). Chon xong dat ?id=... tren URL.
 // Cac the loc: "Tat ca" dung dau, roi 3 trang thai chinh (hoa don bi tu choi chi hien o "Tat ca").
 const TABS = [
@@ -19,14 +73,27 @@ export default function InvoicePicker({ title, hint }) {
   const [tab, setTab] = useState("all");
   const [err, setErr] = useState("");
 
+  // QoL: State quản lý Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   useEffect(() => {
+    // Sửa lại limit=200 để không bị lỗi 422 từ backend
     api("/api/invoices?limit=200").then((r) => setRows(r.data)).catch((e) => setErr(e.message));
   }, []);
+
+  // Reset về trang 1 mỗi khi đổi tab
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tab]);
 
   const open = (id) => setParams({ id: String(id) });
   const count = (st) => (rows || []).filter((r) => !st || r.status === st).length;
   const cur = TABS.find((t) => t[0] === tab);
   const shown = (rows || []).filter((r) => !cur[2] || r.status === cur[2]);
+
+  // Dữ liệu hiển thị trên trang hiện tại
+  const currentRows = shown.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <section className="mx-auto max-w-6xl">
@@ -36,42 +103,57 @@ export default function InvoicePicker({ title, hint }) {
       <div className="mb-5 flex flex-wrap items-center gap-3 text-sm" role="tablist">
         {TABS.map(([k, label, st]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-            className={`rounded-full px-5 py-2 ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
+            className={`rounded-full px-5 py-2 transition-colors ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
             {label}{rows ? ` (${count(st)})` : ""}
           </button>
         ))}
       </div>
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-          <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-            <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
-              <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {shown.map((r) => (
-              <tr key={r.invoice_id} className="cursor-pointer border-t transition-colors hover:bg-blue-50" onClick={() => open(r.invoice_id)}>
-                <td className="px-6 py-4 text-slate-500">{r.invoice_id}</td>
-                <td className="px-6 py-4 font-medium">{r.invoice_number || "—"}</td>
-                <td className="px-6 py-4">{dateVN(r.invoice_date)}</td>
-                <td className="max-w-[24rem] truncate px-6 py-4 font-medium" title={r.seller_name}>{r.seller_name || "—"}</td>
-                <td className="px-6 py-4 text-right font-medium tabular-nums">{money(r.total_amount)}</td>
-                <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
-                <td className="px-6 py-4 text-right">
-                  <button onClick={(e) => { e.stopPropagation(); open(r.invoice_id); }}
-                    className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700">Mở</button>
-                </td>
-              </tr>
-            ))}
-            {rows && shown.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
-                {tab === "all" ? "Chưa có hóa đơn nào." : `Không có hóa đơn nào ở mục “${cur[1]}”.`}
-              </td></tr>
-            )}
-            {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
-          </tbody>
-        </table>
+      
+      <div className="flex flex-col rounded-lg border border-slate-200 bg-white shadow">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+              <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
+                <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {currentRows.map((r) => (
+                <tr key={r.invoice_id} className="cursor-pointer transition-colors hover:bg-blue-50" onClick={() => open(r.invoice_id)}>
+                  <td className="px-6 py-4 text-slate-500">{r.invoice_id}</td>
+                  <td className="px-6 py-4 font-medium">{r.invoice_number || "—"}</td>
+                  <td className="px-6 py-4">{dateVN(r.invoice_date)}</td>
+                  {/* Ép IN HOA (uppercase) tên người bán để chống lỗi font Unicode */}
+                  <td className="max-w-[24rem] truncate px-6 py-4 font-medium uppercase tracking-wide text-slate-700" title={r.seller_name}>{r.seller_name || "—"}</td>
+                  <td className="px-6 py-4 text-right font-medium tabular-nums text-slate-800">{money(r.total_amount)}</td>
+                  <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={(e) => { e.stopPropagation(); open(r.invoice_id); }}
+                      className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700 transition-colors">Mở</button>
+                  </td>
+                </tr>
+              ))}
+              {rows && shown.length === 0 && (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                  {tab === "all" ? "Chưa có hóa đơn nào." : `Không có hóa đơn nào ở mục “${cur[1]}”.`}
+                </td></tr>
+              )}
+              {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        
+        {/* Thanh Phân trang */}
+        {shown.length > 0 && (
+          <Pagination 
+            totalItems={shown.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            setPageSize={setPageSize}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
       </div>
     </section>
   );
