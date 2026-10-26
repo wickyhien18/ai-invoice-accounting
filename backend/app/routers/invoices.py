@@ -12,12 +12,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models import Invoice, User
-from app.security import get_current_user
+from app.security import get_current_user, owned_invoice, require_worker, work_roles
 from app.services import ai_client
 from app.services.checks import run_checks
-from app.services.invoice_data import display_name, process_invoice
+from app.services.invoice_data import display_name, process_invoice, run_in_background
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
 
 router = APIRouter(prefix="/api/invoices", tags=["A"])
@@ -40,10 +40,23 @@ def _num(v: Decimal | None) -> str | None:
     return None if v is None else format(v, "f")
 
 
-def invoice_out(i: Invoice) -> dict:
+def can_edit(i: Invoice, user: User | None) -> bool:
+    """Hoa don cua ai nguoi do sua: chi nguoi tai len (KTV; KTT chi khi bat che do test). KTT mac dinh chi xem va duyet."""
+    return user is not None and user.role_name in work_roles() and i.uploaded_by == user.user_id
+
+
+def _owner_names(db: Session, invoices: list[Invoice]) -> dict[int, str]:
+    ids = {i.uploaded_by for i in invoices}
+    if not ids:
+        return {}
+    return {u.user_id: u.full_name for u in db.scalars(select(User).where(User.user_id.in_(ids)))}
+
+
+def invoice_out(i: Invoice, user: User | None = None, owners: dict[int, str] | None = None) -> dict:
     return {
         "invoice_id": i.invoice_id, "filename": display_name(i.file_path), "file_type": i.file_type,
-        "uploaded_by": i.uploaded_by,
+        "uploaded_by": i.uploaded_by, "uploaded_by_name": (owners or {}).get(i.uploaded_by),
+        "can_edit": can_edit(i, user),
         "invoice_series": i.invoice_series, "invoice_number": i.invoice_number,
         "invoice_date": i.invoice_date.isoformat() if i.invoice_date else None,
         "seller_name": i.seller_name, "mst_seller": i.mst_seller,
@@ -62,14 +75,9 @@ def _get_or_404(db: Session, invoice_id: int) -> Invoice:
     return inv
 
 
-def _process_in_background(invoice_id: int) -> None:
-    with SessionLocal() as db:
-        process_invoice(db, invoice_id)
-
-
 @router.post("", status_code=201)
 def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
-                   db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+                   db: Session = Depends(get_db), user: User = Depends(require_worker)):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED:
         raise HTTPException(415, "Chỉ nhận PDF, PNG, JPG hoặc XML")
@@ -97,8 +105,8 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
         process_invoice(db, inv.invoice_id)  # nhanh, khong can AI nen xu ly ngay
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
-    return {"data": invoice_out(inv)}
+        background.add_task(run_in_background, inv.invoice_id)
+    return {"data": invoice_out(inv, user, {user.user_id: user.full_name})}
 
 
 @router.get("/{invoice_id}/progress")
@@ -108,17 +116,19 @@ def invoice_progress(invoice_id: int, db: Session = Depends(get_db), _: User = D
     if inv.status != "dang_xu_ly":
         return {"data": {"status": inv.status, "percent": 100,
                          "stage": "Không đọc được hóa đơn" if inv.status == "loi_xu_ly" else "Hoàn tất"}}
-    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang chờ xử lý"}
+    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang xếp hàng chờ xử lý"}
     return {"data": {"status": inv.status, **p}}
 
 
 @router.get("")
 def list_invoices(status: str | None = None, file_type: str | None = None, q: str | None = None,
-                  date_from: str | None = None, date_to: str | None = None,
+                  mine: bool = False, date_from: str | None = None, date_to: str | None = None,
                   limit: int = Query(50, ge=1, le=200), offset: int = Query(0, ge=0),
-                  db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+                  db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     from app.services.normalize import parse_date
     cond = []
+    if mine:  # chi hoa don do chinh toi tai len
+        cond.append(Invoice.uploaded_by == user.user_id)
     if status:
         cond.append(Invoice.status == status)
     if file_type:
@@ -134,15 +144,16 @@ def list_invoices(status: str | None = None, file_type: str | None = None, q: st
                 raise HTTPException(422, f"Ngày không hợp lệ: {raw}")
             cond.append(Invoice.invoice_date >= d if op == "ge" else Invoice.invoice_date <= d)
     total = db.scalar(select(func.count()).select_from(Invoice).where(*cond))
-    rows = db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
-                      .limit(limit).offset(offset))
-    return {"data": [invoice_out(r) for r in rows], "total": total}
+    rows = list(db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
+                           .limit(limit).offset(offset)))
+    owners = _owner_names(db, rows)
+    return {"data": [invoice_out(r, user, owners) for r in rows], "total": total}
 
 
 @router.get("/{invoice_id}")
-def get_invoice(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def get_invoice(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     inv = _get_or_404(db, invoice_id)
-    return {"data": {**invoice_out(inv), "checks": run_checks(db, inv)}}
+    return {"data": {**invoice_out(inv, user, _owner_names(db, [inv])), "checks": run_checks(db, inv)}}
 
 
 @router.get("/{invoice_id}/file")
@@ -180,9 +191,8 @@ def check_invoice(invoice_id: int, db: Session = Depends(get_db), _: User = Depe
 
 @router.post("/{invoice_id}/reprocess")
 def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depends(get_db),
-              _: User = Depends(get_current_user)):
-    """Chay lai trich xuat khi loi_xu_ly (VD ai-service tat hoac het han muc Gemini)."""
-    inv = _get_or_404(db, invoice_id)
+              user: User = Depends(get_current_user), inv: Invoice = Depends(owned_invoice)):
+    """Chay lai trich xuat khi loi_xu_ly (VD ai-service tat hoac het han muc Gemini). Chi chu hoa don."""
     if inv.status not in REPROCESSABLE:
         raise HTTPException(409, f"Hóa đơn đang ở trạng thái {inv.status}, không thể xử lý lại")
     inv.status = "dang_xu_ly"
@@ -191,5 +201,5 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
         process_invoice(db, inv.invoice_id)
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
-    return {"data": invoice_out(inv)}
+        background.add_task(run_in_background, inv.invoice_id)
+    return {"data": invoice_out(inv, user, {user.user_id: user.full_name})}

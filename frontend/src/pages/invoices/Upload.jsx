@@ -4,20 +4,25 @@ import InvoiceList from "./InvoiceList.jsx";
 
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.xml";
 const MAX_MB = 10;
+const MAX_FILES = 10;           // toi da so file dang cho/dang xu ly cung luc (XML doc ngay, PDF/anh phai qua OCR nen cham)
+const MAX_PARALLEL_SCANS = 2;   // PDF/anh: toi da bay nhieu file duoc he thong doc cung luc; file sau cho file truoc xong
 const UPLOAD_SHARE = 25;        // thanh tien do: 0-25% la tai len, 25-100% la he thong doc du lieu
 const SUCCESS_SHOW_MS = 8000;   // thong bao thanh cong hien vai giay roi tu mat
 const POLL_MS = 1000;
-const POLL_LIMIT_MS = 5 * 60 * 1000;
+const POLL_LIMIT_MS = 10 * 60 * 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Trang tai hoa don: keo tha nhieu file (PDF, anh, XML), tai tuan tu, roi hien danh sach va trang thai.
-export default function Upload() {
+export default function Upload({ user }) {
+  const canUpload = !!user?.can_work;   // server quyet dinh (KTV; KTT chi khi bat che do test), khong tu doan theo vai tro
   const [queue, setQueue] = useState([]);   // [{id, name, state: cho|dang_tai|xong|loi, msg}]
   const [refreshKey, setRefreshKey] = useState(0);
   const [over, setOver] = useState(false);
   const input = useRef(null);
   const busy = useRef(false);
+  const todo = useRef([]);          // hang doi file chua tai len
   const nextId = useRef(1);
+  const scansReading = useRef(0);   // so file PDF/anh dang duoc he thong doc
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
 
@@ -51,16 +56,27 @@ export default function Upload() {
   }
 
   async function uploadAll(files) {
+    // file con dang cho / dang tai / dang doc chiem cho; vuot MAX_FILES thi tu choi phan thua, tai lai sau khi xong
+    let room = MAX_FILES - queue.filter((x) => ["cho", "dang_tai", "dang_doc"].includes(x.state)).length;
     const items = files.map((file) => {
       const ext = file.name.split(".").pop().toLowerCase();
-      const bad = !ACCEPT.includes(`.${ext}`) ? "Chỉ nhận PDF, PNG, JPG, XML"
+      let bad = !ACCEPT.includes(`.${ext}`) ? "Chỉ nhận PDF, PNG, JPG, XML"
         : file.size > MAX_MB * 1024 * 1024 ? `Lớn hơn ${MAX_MB} MB` : "";
+      if (!bad && room-- <= 0) bad = `Vượt giới hạn ${MAX_FILES} file mỗi lần, hãy tải lại sau khi các file trên xong`;
       return { id: nextId.current++, file, name: file.name, state: bad ? "loi" : "cho", msg: bad };
     });
     setQueue((q) => [...items.map(({ file, ...rest }) => rest), ...q]);
-    if (busy.current) return;           // dang tai dot truoc: dot nay se duoc xu ly boi vong lap hien tai
+    todo.current.push(...items.filter((i) => i.state === "cho"));
+    if (busy.current) return;           // dang tai dot truoc: vong lap hien tai se lay tiep cac file vua them vao todo
     busy.current = true;
-    for (const it of items.filter((i) => i.state === "cho")) {
+    while (todo.current.length) {
+      const it = todo.current.shift();
+      const isScan = !it.name.toLowerCase().endsWith(".xml");
+      // PDF/anh di qua OCR (cham, doc lan luot): chi day them file khi he thong con ranh, tranh xep hang qua dai bi timeout
+      if (isScan && scansReading.current >= MAX_PARALLEL_SCANS) {
+        patch(it.id, { msg: "Chờ file trước đọc xong" });
+        while (alive.current && scansReading.current >= MAX_PARALLEL_SCANS) await sleep(500);
+      }
       patch(it.id, { state: "dang_tai", percent: 0, stage: "Đang tải lên" });
       try {
         const fd = new FormData();
@@ -69,7 +85,8 @@ export default function Upload() {
           (p) => patch(it.id, { percent: Math.round((p * UPLOAD_SHARE) / 100) }));
         if (data.status === "dang_xu_ly") {
           patch(it.id, { state: "dang_doc", percent: UPLOAD_SHARE, stage: "Đã nhận, đang chờ xử lý" });
-          watch(it.id, data.invoice_id);            // khong await: tai file ke tiep ngay
+          scansReading.current++;
+          watch(it.id, data.invoice_id).finally(() => { scansReading.current--; });   // khong await: tai file ke tiep ngay
         } else if (data.status === "loi_xu_ly") {
           patch(it.id, { state: "loi", msg: "Không đọc được hóa đơn" });
         } else {                                    // XML: doc xong ngay khi tai len
@@ -88,8 +105,13 @@ export default function Upload() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Tải hóa đơn</h1>
-      <div
+      <h1 className="text-xl font-semibold">{canUpload ? "Tải hóa đơn" : "Hóa đơn"}</h1>
+      {!canUpload && (
+        <p className="rounded border bg-white p-3 text-sm text-slate-600">
+          Kế toán trưởng chỉ xem và duyệt/từ chối hóa đơn do kế toán viên tải lên. Việc tải và chỉnh sửa do từng kế toán viên phụ trách.
+        </p>
+      )}
+      {canUpload && <div
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files); }}
@@ -99,21 +121,21 @@ export default function Upload() {
         className={`cursor-pointer rounded-lg border-2 border-dashed p-8 text-center ${over ? "border-blue-500 bg-blue-50" : "border-slate-300 bg-white"}`}
       >
         <p className="font-medium">Kéo thả hóa đơn vào đây hoặc bấm để chọn</p>
-        <p className="mt-1 text-sm text-slate-500">PDF, ảnh (PNG, JPG) hoặc XML hóa đơn điện tử · tối đa {MAX_MB} MB mỗi file · chọn được nhiều file</p>
+        <p className="mt-1 text-sm text-slate-500">PDF, ảnh (PNG, JPG) hoặc XML hóa đơn điện tử · tối đa {MAX_MB} MB mỗi file · tối đa {MAX_FILES} file mỗi lần</p>
         <input ref={input} type="file" multiple accept={ACCEPT} className="hidden"
           onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
-      </div>
+      </div>}
 
       {queue.length > 0 && (
         <ul className="space-y-1 text-sm">
-          {queue.slice(0, 8).map((x) => {
+          {[...queue.filter((x) => x.state === "loi"), ...queue.filter((x) => x.state !== "loi")].slice(0, 12).map((x) => {   // file loi/bi tu choi len dau de khong bi che
             const working = x.state === "dang_tai" || x.state === "dang_doc";
             return (
               <li key={x.id} className="rounded border bg-white px-3 py-1.5">
                 <div className="flex items-center gap-2">
                   <span className="truncate">{x.name}</span>
                   <span className={`ml-auto shrink-0 ${x.state === "loi" ? "text-red-600" : x.state === "xong" ? "text-green-700" : "text-slate-500"}`}>
-                    {x.state === "cho" ? "Đang chờ"
+                    {x.state === "cho" ? (x.msg || "Đang chờ")
                       : working ? `${x.stage} · ${x.percent}%`
                       : x.state === "xong" ? `✓ ${x.msg}` : x.msg}
                   </span>
@@ -130,7 +152,7 @@ export default function Upload() {
         </ul>
       )}
 
-      <InvoiceList refreshKey={refreshKey} />
+      <InvoiceList refreshKey={refreshKey} user={user} />
     </div>
   );
 }

@@ -10,15 +10,60 @@ const ROWS = [
   ["vat_amount", "Tiền thuế", money], ["total_amount", "Tổng thanh toán", money],
 ];
 
+const POLL_MS = 1000;
+const POLL_LIMIT_MS = 10 * 60 * 1000;   // khop voi thoi gian cho toi da cua backend (hoa don xep hang cuoi co the cho lau)
+const SUCCESS_SHOW_MS = 8000;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
   const [inv, setInv] = useState(null);
   const [check, setCheck] = useState(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [prog, setProg] = useState(null);   // {percent, stage} khi dang doc/xu ly lai
+  const [done, setDone] = useState("");     // thong bao thanh cong, tu mat sau vai giay
 
   const load = () => api(`/api/invoices/${invoiceId}`).then((r) => { setInv(r.data); setCheck(r.data.checks); })
     .catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [invoiceId]);
+
+  // Hoa don dang xu ly (vua tai len hoac bam "Xu ly lai"): hoi tien do moi giay cho den khi xong, nhu luc tai len.
+  const processing = inv?.status === "dang_xu_ly";
+  useEffect(() => {
+    if (!processing) return;
+    let stop = false;
+    (async () => {
+      const t0 = Date.now();
+      let fails = 0;
+      setDone("");
+      while (!stop && Date.now() - t0 < POLL_LIMIT_MS) {
+        try {
+          const { data } = await api(`/api/invoices/${invoiceId}/progress`);
+          if (stop) return;
+          fails = 0;
+          if (data.status !== "dang_xu_ly") {
+            setProg(null);
+            if (data.status !== "loi_xu_ly") setDone("Đọc dữ liệu thành công");
+            await load();
+            onChanged?.();
+            return;
+          }
+          setProg({ percent: data.percent, stage: data.stage });
+        } catch {
+          if (++fails >= 5) break;
+        }
+        await sleep(POLL_MS);
+      }
+      if (!stop) { setProg(null); load(); }   // het gio cho: tai lai de thay trang thai that
+    })();
+    return () => { stop = true; };
+  }, [processing, invoiceId]);
+
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(""), SUCCESS_SHOW_MS);
+    return () => clearTimeout(t);
+  }, [done]);
 
   async function run(fn) {
     setBusy(true); setErr("");
@@ -43,6 +88,23 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
             <p className="mb-3 flex items-center gap-2 text-sm text-slate-600">
               <StatusBadge status={inv.status} /> {FILE_TYPE[inv.file_type]} · {inv.filename}
             </p>
+            <p className="mb-3 text-sm text-slate-600">
+              Phụ trách: <b>{inv.uploaded_by_name || "—"}</b>
+              {!inv.can_edit && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-xs">Chỉ xem</span>}
+            </p>
+            {processing && (
+              <div className="mb-3 rounded border bg-white p-3 text-sm" aria-live="polite">
+                <div className="flex items-center gap-2">
+                  <span className="truncate">{prog?.stage || "Đang chờ xử lý"}</span>
+                  <span className="ml-auto shrink-0 text-slate-500">{prog?.percent ?? 5}%</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar"
+                  aria-valuemin={0} aria-valuemax={100} aria-valuenow={prog?.percent ?? 5} aria-label="Tiến độ xử lý hóa đơn">
+                  <div className="h-full rounded-full bg-blue-600 transition-all duration-500" style={{ width: `${prog?.percent ?? 5}%` }} />
+                </div>
+              </div>
+            )}
+            {done && <p className="mb-3 rounded bg-green-50 p-2 text-sm text-green-700">✓ {done}</p>}
             <dl className="mb-4 grid grid-cols-[9rem_1fr] gap-y-1 text-sm">
               {ROWS.map(([k, label, fmt]) => (
                 <div key={k} className="contents">
@@ -55,11 +117,16 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
               <button disabled={busy} onClick={openFile} className="rounded border px-3 py-1 text-sm">Xem file gốc</button>
               <button disabled={busy || inv.status === "dang_xu_ly"} onClick={runCheck}
                 className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50">Kiểm tra sơ bộ</button>
-              {["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
+              {inv.can_edit && ["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
                 <button disabled={busy} onClick={reprocess} className="rounded border px-3 py-1 text-sm">Xử lý lại</button>
               )}
             </div>
-            {inv.status === "loi_xu_ly" && (
+            {!inv.can_edit && (
+              <p className="mb-3 rounded bg-slate-100 p-2 text-sm text-slate-600">
+                Hóa đơn này do {inv.uploaded_by_name || "kế toán viên khác"} phụ trách nên bạn chỉ xem được. Chỉ người tải lên mới chỉnh sửa.
+              </p>
+            )}
+            {inv.can_edit && inv.status === "loi_xu_ly" && (
               <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">
                 Không đọc được hóa đơn (dịch vụ AI tắt hoặc hết hạn mức). Hãy thử “Xử lý lại” sau.
               </p>
