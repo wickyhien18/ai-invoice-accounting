@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, health, invoices, mock_contract
+from app.routers import auth, b_fields, health, invoices, mock_contract
 from app.services.invoice_data import recover_stuck_in_thread
 
 
@@ -25,4 +25,5 @@ settings.upload_dir.mkdir(parents=True, exist_ok=True)
 app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(invoices.router)
+app.include_router(b_fields.router)
 app.include_router(mock_contract.router)

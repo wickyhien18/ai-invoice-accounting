@@ -13,8 +13,7 @@ const POLL_LIMIT_MS = 10 * 60 * 1000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Trang tai hoa don: keo tha nhieu file (PDF, anh, XML), tai tuan tu, roi hien danh sach va trang thai.
-export default function Upload({ user }) {
-  const canUpload = !!user?.can_work;   // server quyet dinh (KTV; KTT chi khi bat che do test), khong tu doan theo vai tro
+export default function Upload() {
   const [queue, setQueue] = useState([]);   // [{id, name, state: cho|dang_tai|xong|loi, msg}]
   const [refreshKey, setRefreshKey] = useState(0);
   const [over, setOver] = useState(false);
@@ -105,13 +104,8 @@ export default function Upload({ user }) {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">{canUpload ? "Tải hóa đơn" : "Hóa đơn"}</h1>
-      {!canUpload && (
-        <p className="rounded border bg-white p-3 text-sm text-slate-600">
-          Kế toán trưởng chỉ xem và duyệt/từ chối hóa đơn do kế toán viên tải lên. Việc tải và chỉnh sửa do từng kế toán viên phụ trách.
-        </p>
-      )}
-      {canUpload && <div
+      <h1 className="text-xl font-semibold">Tải hóa đơn</h1>
+      <div
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files); }}
@@ -124,7 +118,7 @@ export default function Upload({ user }) {
         <p className="mt-1 text-sm text-slate-500">PDF, ảnh (PNG, JPG) hoặc XML hóa đơn điện tử · tối đa {MAX_MB} MB mỗi file · tối đa {MAX_FILES} file mỗi lần</p>
         <input ref={input} type="file" multiple accept={ACCEPT} className="hidden"
           onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
-      </div>}
+      </div>
 
       {queue.length > 0 && (
         <ul className="space-y-1 text-sm">
@@ -152,7 +146,7 @@ export default function Upload({ user }) {
         </ul>
       )}
 
-      <InvoiceList refreshKey={refreshKey} user={user} />
+      <InvoiceList refreshKey={refreshKey} />
     </div>
   );
 }

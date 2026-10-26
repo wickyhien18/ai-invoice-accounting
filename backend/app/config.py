@@ -19,11 +19,6 @@ class Settings:
     access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
     ai_service_url = os.getenv("AI_SERVICE_URL", "http://localhost:8001")
     upload_dir = Path(os.getenv("UPLOAD_DIR", "storage/uploads"))
-    # Ma moi de dang ky tai khoan Ke toan truong (KTT). De trong = KHONG ai tu dang ky KTT duoc.
-    ktt_invite_code = os.getenv("KTT_INVITE_CODE", "").strip()
-    # CHI DE TEST: KTT_CAN_WORK=1 cho ke toan truong lam duoc viec cua ke toan vien (tai, sua hoa don CUA MINH).
-    # Khi chay that de 0/bo trong: KTT chi xem va duyet.
-    ktt_can_work = os.getenv("KTT_CAN_WORK", "0").strip().lower() in ("1", "true", "yes")
 
     @property
     def database_url(self) -> str:

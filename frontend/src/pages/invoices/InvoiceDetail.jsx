@@ -88,10 +88,6 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
             <p className="mb-3 flex items-center gap-2 text-sm text-slate-600">
               <StatusBadge status={inv.status} /> {FILE_TYPE[inv.file_type]} · {inv.filename}
             </p>
-            <p className="mb-3 text-sm text-slate-600">
-              Phụ trách: <b>{inv.uploaded_by_name || "—"}</b>
-              {!inv.can_edit && <span className="ml-2 rounded bg-slate-200 px-1.5 py-0.5 text-xs">Chỉ xem</span>}
-            </p>
             {processing && (
               <div className="mb-3 rounded border bg-white p-3 text-sm" aria-live="polite">
                 <div className="flex items-center gap-2">
@@ -117,16 +113,11 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
               <button disabled={busy} onClick={openFile} className="rounded border px-3 py-1 text-sm">Xem file gốc</button>
               <button disabled={busy || inv.status === "dang_xu_ly"} onClick={runCheck}
                 className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50">Kiểm tra sơ bộ</button>
-              {inv.can_edit && ["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
+              {["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
                 <button disabled={busy} onClick={reprocess} className="rounded border px-3 py-1 text-sm">Xử lý lại</button>
               )}
             </div>
-            {!inv.can_edit && (
-              <p className="mb-3 rounded bg-slate-100 p-2 text-sm text-slate-600">
-                Hóa đơn này do {inv.uploaded_by_name || "kế toán viên khác"} phụ trách nên bạn chỉ xem được. Chỉ người tải lên mới chỉnh sửa.
-              </p>
-            )}
-            {inv.can_edit && inv.status === "loi_xu_ly" && (
+            {inv.status === "loi_xu_ly" && (
               <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">
                 Không đọc được hóa đơn (dịch vụ AI tắt hoặc hết hạn mức). Hãy thử “Xử lý lại” sau.
               </p>

@@ -5,12 +5,11 @@ import StatusBadge from "./StatusBadge.jsx";
 import { dateVN, FILE_TYPE, money, STATUS } from "./format.js";
 
 // Danh sach hoa don + bo loc. `refreshKey` doi gia tri thi tai lai (trang tai len dung de bao co hoa don moi).
-export default function InvoiceList({ refreshKey = 0, user }) {
+export default function InvoiceList({ refreshKey = 0 }) {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("");
-  const [mine, setMine] = useState(false);   // chi hoa don do chinh toi tai len
   const [selected, setSelected] = useState(null);
   const [err, setErr] = useState("");
 
@@ -18,10 +17,9 @@ export default function InvoiceList({ refreshKey = 0, user }) {
     const p = new URLSearchParams({ limit: "100" });
     if (q.trim()) p.set("q", q.trim());
     if (status) p.set("status", status);
-    if (mine) p.set("mine", "true");
     return api(`/api/invoices?${p}`).then((r) => { setRows(r.data); setTotal(r.total); setErr(""); })
       .catch((e) => setErr(e.message));
-  }, [q, status, mine]);
+  }, [q, status]);
 
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [load, refreshKey]);
 
@@ -42,18 +40,13 @@ export default function InvoiceList({ refreshKey = 0, user }) {
           <option value="">Mọi trạng thái</option>
           {Object.entries(STATUS).map(([k, [label]]) => <option key={k} value={k}>{label}</option>)}
         </select>
-        {user?.can_work && (
-          <label className="flex items-center gap-1.5 text-sm">
-            <input type="checkbox" checked={mine} onChange={(e) => setMine(e.target.checked)} /> Chỉ hóa đơn của tôi
-          </label>
-        )}
         <span className="ml-auto text-sm text-slate-500">{total} hóa đơn</span>
       </div>
       {err && <p className="mb-2 text-sm text-red-600">{err}</p>}
       <div className="overflow-x-auto rounded border bg-white">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-            <tr>{["Tệp", "Loại", "Số HĐ", "Ngày", "Người bán", "MST", "Tổng tiền", "Trạng thái", "Phụ trách", ""].map((h) => (
+            <tr>{["Tệp", "Loại", "Số HĐ", "Ngày", "Người bán", "MST", "Tổng tiền", "Trạng thái", ""].map((h) => (
               <th key={h} className="px-3 py-2 font-medium">{h}</th>))}</tr>
           </thead>
           <tbody>
@@ -67,14 +60,11 @@ export default function InvoiceList({ refreshKey = 0, user }) {
                 <td className="px-3 py-2">{r.mst_seller || "—"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{money(r.total_amount)}</td>
                 <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
-                <td className="max-w-[10rem] truncate px-3 py-2" title={r.uploaded_by_name}>
-                  {r.uploaded_by_name || "—"}{r.uploaded_by === user?.user_id && <span className="ml-1 text-xs text-blue-700">(bạn)</span>}
-                </td>
                 <td className="px-3 py-2"><button className="text-blue-700" onClick={() => setSelected(r.invoice_id)}>Xem</button></td>
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-8 text-center text-slate-500">Chưa có hóa đơn nào.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-500">Chưa có hóa đơn nào.</td></tr>
             )}
           </tbody>
         </table>
