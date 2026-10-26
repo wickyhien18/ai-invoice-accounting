@@ -45,9 +45,17 @@ def extract_endpoint(file: UploadFile | None = File(None), text: str | None = Fo
     job_id (tuy chon): de hoi tien do qua GET /progress/{job_id}."""
     if file is None and not text:
         raise HTTPException(422, "Can gui file hoac text")
-    progress.set_progress(job_id, 15, "Đang đọc chữ trên tài liệu")
+    reading = lambda: progress.set_progress(job_id, 15, "Đang đọc chữ trên tài liệu")  # noqa: E731
+    if ocr.is_busy():  # ai-service doc anh lan luot: bao ro dang xep hang thay vi dung im o 15%
+        progress.set_progress(job_id, 5, "Đang chờ tới lượt (hóa đơn khác đang được đọc)")
+    else:
+        reading()
     if file is not None:
-        o = _run_ocr(file, force_ocr, preprocess)
+        token = ocr.ON_START.set(reading)  # toi luot that thi chuyen sang 'Dang doc chu'
+        try:
+            o = _run_ocr(file, force_ocr, preprocess)
+        finally:
+            ocr.ON_START.reset(token)
     else:
         o = {"text": text, "lines": None, "avg_confidence": None, "source": "text"}
     progress.set_progress(job_id, 55, "Đang trích xuất các trường bằng AI")

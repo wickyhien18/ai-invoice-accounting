@@ -130,3 +130,83 @@ def test_vendor_suggestion(client, monkeypatch):
         "canonical": cands[0], "score": 96.0, "matched": True})
     c = client.post("/api/invoices/2/check", headers=H(client)).json()["data"]
     assert c["vendor_suggestion"]["canonical"] == "Công ty CP Vận tải Mẫu Thử Dũng"
+
+
+def test_progress_endpoint(client, monkeypatch):
+    monkeypatch.setattr(ai_client, "extract_invoice", lambda path, name: {"fields": {}})
+    inv = up(client, "a.pdf", (DATA / "pdf" / "HD001.pdf").read_bytes()).json()["data"]
+    # da xu ly xong -> 100%
+    p = client.get(f"/api/invoices/{inv['invoice_id']}/progress", headers=H(client)).json()["data"]
+    assert p["percent"] == 100 and p["status"] == "cho_xac_nhan"
+    # dang xu ly: lay tien do tu ai-service; ai-service khong tra loi -> van co gia tri du phong
+    from app.database import SessionLocal
+    from app.models import Invoice
+    with SessionLocal() as db:
+        db.get(Invoice, inv["invoice_id"]).status = "dang_xu_ly"
+        db.commit()
+    monkeypatch.setattr(ai_client, "get_progress", lambda job: {"percent": 55, "stage": "Đang trích xuất"})
+    p = client.get(f"/api/invoices/{inv['invoice_id']}/progress", headers=H(client)).json()["data"]
+    assert (p["status"], p["percent"]) == ("dang_xu_ly", 55)
+    monkeypatch.setattr(ai_client, "get_progress", lambda job: None)
+    assert client.get(f"/api/invoices/{inv['invoice_id']}/progress", headers=H(client)).json()["data"]["percent"] == 5
+    assert client.get("/api/invoices/999999/progress", headers=H(client)).status_code == 404
+    assert client.get(f"/api/invoices/{inv['invoice_id']}/progress").status_code == 401
+
+
+def test_unexpected_error_marks_loi_xu_ly_not_stuck(client, monkeypatch):
+    """Loi bat ngo (khong nam trong danh sach loi quen thuoc) van phai ra loi_xu_ly, khong ket 'dang_xu_ly'."""
+    def boom(path, name):
+        raise ValueError("loi bat ngo")
+    monkeypatch.setattr(ai_client, "extract_invoice", boom)
+    inv = up(client, "a.pdf", (DATA / "pdf" / "HD001.pdf").read_bytes()).json()["data"]
+    assert client.get(f"/api/invoices/{inv['invoice_id']}", headers=H(client)).json()["data"]["status"] == "loi_xu_ly"
+
+
+def test_background_jobs_run_one_at_a_time(monkeypatch):
+    """Nhieu hoa don PDF/anh cung luc: ai-service chi nhan mot yeu cau moi lan."""
+    import threading
+    import time
+    from app.database import SessionLocal
+    from app.models import Invoice
+    from app.services.invoice_data import run_in_background
+    with SessionLocal() as db:
+        ids = []
+        for n in range(4):
+            inv = Invoice(uploaded_by=1, file_path=f"x{n}_a.pdf", file_type="pdf", status="dang_xu_ly")
+            db.add(inv)
+            db.commit()
+            ids.append(inv.invoice_id)
+    state = {"now": 0, "max": 0}
+    guard = threading.Lock()
+
+    def slow(path, name):
+        with guard:
+            state["now"] += 1
+            state["max"] = max(state["max"], state["now"])
+        time.sleep(0.05)
+        with guard:
+            state["now"] -= 1
+        return {"fields": {}}
+    monkeypatch.setattr(ai_client, "extract_invoice", slow)
+    ts = [threading.Thread(target=run_in_background, args=(i,)) for i in ids]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert state["max"] == 1
+    with SessionLocal() as db:
+        assert {db.get(Invoice, i).status for i in ids} == {"cho_xac_nhan"}   # ca 4 deu xong
+
+
+def test_recover_stuck_reprocesses_invoices_left_processing(monkeypatch):
+    from app.database import SessionLocal
+    from app.models import Invoice
+    from app.services.invoice_data import recover_stuck
+    with SessionLocal() as db:
+        a = Invoice(uploaded_by=1, file_path="x1_a.pdf", file_type="pdf", status="dang_xu_ly")
+        b = Invoice(uploaded_by=1, file_path="x2_b.pdf", file_type="pdf", status="da_duyet")
+        db.add_all([a, b])
+        db.commit()
+        ia, ib = a.invoice_id, b.invoice_id
+    monkeypatch.setattr(ai_client, "extract_invoice", lambda path, name: {"fields": {}})
+    assert recover_stuck() == 1
+    with SessionLocal() as db:
+        assert db.get(Invoice, ia).status == "cho_xac_nhan" and db.get(Invoice, ib).status == "da_duyet"

@@ -3,12 +3,14 @@
 Goi B (sua truong) nen goi sync_invoice_from_fields() sau khi ghi final_value de bang invoices luon khop.
 """
 import logging
+import threading
 from decimal import Decimal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import SessionLocal
 from app.models import Invoice, InvoiceField
 from app.services import ai_client
 from app.services.normalize import FIELD_NAMES, canonical, to_column
@@ -68,10 +70,45 @@ def process_invoice(db: Session, invoice_id: int) -> str:
         result = extract_fields(inv)
         save_extraction(db, inv, result["fields"])
         inv.status = "cho_xac_nhan"
-    except (XmlInvoiceError, ai_client.AIServiceError, OSError, KeyError) as e:
-        log.error("Xu ly hoa don %s loi: %s", invoice_id, e)
+    except Exception as e:  # MOI loi deu phai ra loi_xu_ly; neu de lot thi hoa don ket 'dang_xu_ly' mai mai
+        known = isinstance(e, (XmlInvoiceError, ai_client.AIServiceError, OSError, KeyError))
+        log.error("Xu ly hoa don %s loi: %s", invoice_id, e, exc_info=not known)
         db.rollback()
         inv = db.get(Invoice, invoice_id)
         inv.status = "loi_xu_ly"
     db.commit()
     return inv.status
+
+
+# ---- Xu ly nen: PDF/anh doc LAN LUOT de moi hoa don deu xong, khong tranh nhau/qua han ----
+_SCAN_LOCK = threading.Lock()
+
+
+def run_in_background(invoice_id: int) -> None:
+    """Chay process_invoice trong luong nen. Cac hoa don xep hang o day (khong giu ket noi toi ai-service
+    luc cho), ai-service chi nhan MOT yeu cau moi lan -> khong timeout khi tai nhieu file."""
+    with _SCAN_LOCK:
+        with SessionLocal() as db:
+            process_invoice(db, invoice_id)
+
+
+def recover_stuck() -> int:
+    """Luc khoi dong lai backend, nhung hoa don con 'dang_xu_ly' (tac vu nen bi mat do tat/reload) duoc xu ly lai
+    lan luot. Tra ve so hoa don duoc nhat lai."""
+    with SessionLocal() as db:
+        ids = list(db.scalars(select(Invoice.invoice_id).where(Invoice.status == "dang_xu_ly")
+                              .order_by(Invoice.invoice_id)))
+    for i in ids:
+        run_in_background(i)
+    return len(ids)
+
+
+def recover_stuck_in_thread() -> None:
+    def work():
+        try:
+            n = recover_stuck()
+            if n:
+                log.info("Da xu ly lai %s hoa don bi do dang luc khoi dong", n)
+        except Exception:
+            log.exception("Khong nhat lai duoc hoa don dang do")
+    threading.Thread(target=work, daemon=True, name="recover-invoices").start()

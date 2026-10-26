@@ -12,12 +12,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models import Invoice, User
 from app.security import get_current_user
 from app.services import ai_client
 from app.services.checks import run_checks
-from app.services.invoice_data import display_name, process_invoice
+from app.services.invoice_data import display_name, process_invoice, run_in_background
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
 
 router = APIRouter(prefix="/api/invoices", tags=["A"])
@@ -62,11 +62,6 @@ def _get_or_404(db: Session, invoice_id: int) -> Invoice:
     return inv
 
 
-def _process_in_background(invoice_id: int) -> None:
-    with SessionLocal() as db:
-        process_invoice(db, invoice_id)
-
-
 @router.post("", status_code=201)
 def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
                    db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -97,7 +92,7 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
         process_invoice(db, inv.invoice_id)  # nhanh, khong can AI nen xu ly ngay
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
+        background.add_task(run_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}
 
 
@@ -108,7 +103,7 @@ def invoice_progress(invoice_id: int, db: Session = Depends(get_db), _: User = D
     if inv.status != "dang_xu_ly":
         return {"data": {"status": inv.status, "percent": 100,
                          "stage": "Không đọc được hóa đơn" if inv.status == "loi_xu_ly" else "Hoàn tất"}}
-    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang chờ xử lý"}
+    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang xếp hàng chờ xử lý"}
     return {"data": {"status": inv.status, **p}}
 
 
@@ -134,8 +129,8 @@ def list_invoices(status: str | None = None, file_type: str | None = None, q: st
                 raise HTTPException(422, f"Ngày không hợp lệ: {raw}")
             cond.append(Invoice.invoice_date >= d if op == "ge" else Invoice.invoice_date <= d)
     total = db.scalar(select(func.count()).select_from(Invoice).where(*cond))
-    rows = db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
-                      .limit(limit).offset(offset))
+    rows = list(db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
+                           .limit(limit).offset(offset)))
     return {"data": [invoice_out(r) for r in rows], "total": total}
 
 
@@ -191,5 +186,5 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
         process_invoice(db, inv.invoice_id)
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
+        background.add_task(run_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}

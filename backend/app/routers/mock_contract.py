@@ -31,16 +31,6 @@ def mock(data, **extra):
 
 
 # ---- Goi B (Khanh) ----
-@router.get("/invoices/{invoice_id}/fields", tags=["B"])
-def get_fields(invoice_id: int):
-    return mock(SAMPLE_FIELDS)
-
-
-@router.patch("/invoices/{invoice_id}/fields/{field_id}", tags=["B"])
-def patch_field(invoice_id: int, field_id: int):
-    return mock({**SAMPLE_FIELDS[0], "field_id": field_id})
-
-
 @router.post("/invoices/{invoice_id}/suggest-entries", tags=["B"])
 def suggest_entries(invoice_id: int):
     return mock([{"debit_account": "642", "credit_account": "331", "amount": "1000000.00",
@@ -53,3 +43,47 @@ def put_entries(invoice_id: int):
 
 
 # ---- Goi C (Duong) ----
+@router.post("/invoices/{invoice_id}/submit", tags=["C"])
+def submit(invoice_id: int):
+    return mock({"status": "cho_duyet"})
+
+
+@router.post("/invoices/{invoice_id}/approve", tags=["C"], dependencies=[Depends(require_role("KTT"))])
+def approve(invoice_id: int):
+    return mock({"status": "da_duyet"})
+
+
+@router.post("/invoices/{invoice_id}/reject", tags=["C"], dependencies=[Depends(require_role("KTT"))])
+def reject(invoice_id: int):
+    return mock({"status": "tu_choi"})
+
+
+@router.get("/approvals", tags=["C"])
+def approvals():
+    return mock([{**SAMPLE_INVOICE, "status": "cho_duyet", "anomaly_score": 0.12}])
+
+
+@router.post("/exports/sheet", tags=["C"])
+def export_sheet():
+    return mock({"exported": 1, "export_status": "da_xuat"})
+
+
+@router.get("/purchase-orders", tags=["C"])
+def list_pos():
+    return mock([{"po_id": 1, "po_number": "PO-001", "vendor": "CONG TY TNHH MAU",
+                  "expected_amount": "1100000.00", "status": "open"}])
+
+
+@router.post("/purchase-orders", tags=["C"])
+def create_po():
+    return mock({"po_id": 2})
+
+
+@router.post("/invoices/{invoice_id}/match-po", tags=["C"])
+def match_po(invoice_id: int):
+    return mock({"po_id": 1, "amount_difference": "0.00", "match_status": "khop"})
+
+
+@router.get("/reports/spending", tags=["C"])
+def spending():
+    return mock({"by_month": [{"month": "2026-01", "total": "1100000.00"}]})
