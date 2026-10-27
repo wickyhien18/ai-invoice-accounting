@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, fetchBlobUrl } from "../../api/client.js";
 import StatusBadge from "./StatusBadge.jsx";
+import { creep } from "./smoothProgress.js";
 import { dateVN, FILE_TYPE, money } from "./format.js";
 
 const ROWS = [
@@ -27,6 +28,17 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
     .catch((e) => setErr(e.message));
   useEffect(() => { load(); }, [invoiceId]);
 
+  // Tu dong kiem tra so bo (MST, tong tien, trung hoa don + goi y thong nhat ten nguoi ban) moi khi mo hoa don
+  // hoac khi doc xong; khong can bam nut. Loi mang chi bo qua vi ket qua co ban da co tu load().
+  const settled = inv && inv.status !== "dang_xu_ly";
+  useEffect(() => {
+    if (!settled) return;
+    let stop = false;
+    api(`/api/invoices/${invoiceId}/check`, { method: "POST" })
+      .then((r) => { if (!stop) setCheck(r.data); }).catch(() => {});
+    return () => { stop = true; };
+  }, [invoiceId, settled, inv?.status]);
+
   // Hoa don dang xu ly (vua tai len hoac bam "Xu ly lai"): hoi tien do moi giay cho den khi xong, nhu luc tai len.
   const processing = inv?.status === "dang_xu_ly";
   useEffect(() => {
@@ -35,6 +47,7 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
     (async () => {
       const t0 = Date.now();
       let fails = 0;
+      let shown = 0;
       setDone("");
       while (!stop && Date.now() - t0 < POLL_LIMIT_MS) {
         try {
@@ -48,7 +61,8 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
             onChanged?.();
             return;
           }
-          setProg({ percent: data.percent, stage: data.stage });
+          shown = creep(shown, data.percent);
+          setProg({ percent: Math.round(shown), stage: data.stage });
         } catch {
           if (++fails >= 5) break;
         }
@@ -70,7 +84,6 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
     try { await fn(); } catch (e) { setErr(e.message); } finally { setBusy(false); }
   }
 
-  const runCheck = () => run(async () => setCheck((await api(`/api/invoices/${invoiceId}/check`, { method: "POST" })).data));
   const reprocess = () => run(async () => { await api(`/api/invoices/${invoiceId}/reprocess`, { method: "POST" }); onChanged?.(); await load(); });
   // Chung tu tai chinh can dang nhap: lay blob kem token roi mo tab moi
   const openFile = () => run(async () => window.open(await fetchBlobUrl(`/api/invoices/${invoiceId}/file`), "_blank", "noopener"));
@@ -110,11 +123,9 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
               ))}
             </dl>
             <div className="mb-4 flex flex-wrap gap-2">
-              <button disabled={busy} onClick={openFile} className="rounded border px-3 py-1 text-sm">Xem file gốc</button>
-              <button disabled={busy || inv.status === "dang_xu_ly"} onClick={runCheck}
-                className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50">Kiểm tra sơ bộ</button>
+              <button disabled={busy} onClick={openFile} className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Xem file gốc</button>
               {["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
-                <button disabled={busy} onClick={reprocess} className="rounded border px-3 py-1 text-sm">Xử lý lại</button>
+                <button disabled={busy} onClick={reprocess} className="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">Xử lý lại</button>
               )}
             </div>
             {inv.status === "loi_xu_ly" && (
@@ -161,7 +172,7 @@ function CheckResult({ c }) {
   const unknown = [mst, totals, dup].filter((x) => x === "unknown").length;
   return (
     <section className="rounded border p-3 text-sm">
-      <h3 className="mb-1 font-medium">Kết quả kiểm tra sơ bộ</h3>
+      <h3 className="mb-1 font-medium">Kiểm tra sơ bộ tự động</h3>
       <p className={`mb-2 text-xs font-medium ${bad ? "text-red-700" : unknown ? "text-slate-500" : "text-green-700"}`}>
         {bad ? `Có ${bad} mục không đạt, cần xem lại trước khi xác nhận`
           : unknown ? "Chưa có lỗi, nhưng còn mục chưa kiểm tra được" : "Tất cả mục kiểm tra đều đạt"}

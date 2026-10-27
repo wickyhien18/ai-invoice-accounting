@@ -17,7 +17,7 @@ from app.models import Invoice, User
 from app.security import get_current_user
 from app.services import ai_client
 from app.services.checks import run_checks
-from app.services.invoice_data import display_name, process_invoice, run_in_background
+from app.services.invoice_data import display_name, is_running, process_invoice, run_in_background
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
 
 router = APIRouter(prefix="/api/invoices", tags=["A"])
@@ -103,7 +103,10 @@ def invoice_progress(invoice_id: int, db: Session = Depends(get_db), _: User = D
     if inv.status != "dang_xu_ly":
         return {"data": {"status": inv.status, "percent": 100,
                          "stage": "Không đọc được hóa đơn" if inv.status == "loi_xu_ly" else "Hoàn tất"}}
-    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang xếp hàng chờ xử lý"}
+    if is_running(inv.invoice_id):  # chi hoi ai-service khi da toi luot -> khong con 404 spam
+        p = ai_client.get_progress(inv.file_path) or {"percent": 8, "stage": "Đang chuẩn bị đọc hóa đơn"}
+    else:
+        p = {"percent": 5, "stage": "Đang xếp hàng chờ tới lượt"}
     return {"data": {"status": inv.status, **p}}
 
 
