@@ -3,62 +3,7 @@ import { api } from "../../api/client.js";
 import InvoiceDetail from "./InvoiceDetail.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import { dateVN, FILE_TYPE, money, STATUS } from "./format.js";
-
-// ---------------------------------------------------------
-// COMPONENT PHÂN TRANG DÙNG CHUNG
-// ---------------------------------------------------------
-const Pagination = ({ totalItems, pageSize, currentPage, setPageSize, setCurrentPage }) => {
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
-
-  return (
-    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
-        <span>Hiển thị</span>
-        <select 
-          value={pageSize} 
-          onChange={(e) => { 
-            setPageSize(Number(e.target.value)); 
-            setCurrentPage(1); 
-          }}
-          className="border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
-        >
-          <option value={10}>10</option>
-          <option value={20}>20</option>
-          <option value={50}>50</option>
-          <option value={100}>100</option>
-        </select>
-        <span>dòng / trang</span>
-      </div>
-      
-      <div className="flex items-center gap-4 text-sm font-medium">
-        <span className="text-slate-500">
-          Hiển thị {Math.min((currentPage - 1) * pageSize + 1, totalItems)} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số {totalItems} dòng
-        </span>
-        
-        <div className="flex items-center gap-2">
-          <button 
-            disabled={currentPage === 1} 
-            onClick={() => setCurrentPage(p => p - 1)}
-            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
-          >
-            Trước
-          </button>
-          <div className="px-4 py-1.5 bg-slate-200 text-slate-800 rounded font-bold">
-            Trang {currentPage} / {totalPages}
-          </div>
-          <button 
-            disabled={currentPage === totalPages || totalPages === 0} 
-            onClick={() => setCurrentPage(p => p + 1)}
-            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
-          >
-            Sau
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
+import Pagination from "../../components/Pagination.jsx";
 
 // Danh sach hoa don + bo loc.
 export default function InvoiceList({ refreshKey = 0 }) {
@@ -69,13 +14,14 @@ export default function InvoiceList({ refreshKey = 0 }) {
   const [selected, setSelected] = useState(null);
   const [err, setErr] = useState("");
 
-  // State phân trang
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10); 
 
-  // State cho Pop-up Xóa
+  // State cho Pop-up Xóa và Mật khẩu
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [password, setPassword] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
 
   const load = useCallback(() => {
     const p = new URLSearchParams({ 
@@ -106,21 +52,33 @@ export default function InvoiceList({ refreshKey = 0 }) {
     return () => clearInterval(t);
   }, [processing, load]);
 
-  // HÀM GỌI CỬA SỔ XÁC NHẬN XÓA
   const requestDelete = (id) => {
     setDeleteConfirmId(id);
+    setPassword("");
+    setDeleteErr("");
   };
 
-  // HÀM THỰC THI XÓA SAU KHI ĐỒNG Ý
-  const executeDelete = async () => {
-    if (!deleteConfirmId) return;
+  const handleExecuteDelete = async (e) => {
+    e.preventDefault();
+    if (!password.trim()) {
+      setDeleteErr("Vui lòng nhập mật khẩu xác nhận!");
+      return;
+    }
+
     setIsDeleting(true);
+    setDeleteErr("");
+
     try {
-      await api(`/api/invoices/${deleteConfirmId}`, { method: "DELETE" });
+      // Gọi API xóa (có thể truyền kèm mật khẩu trong body hoặc header tùy backend của bạn, ở đây gửi body json)
+      await api(`/api/invoices/${deleteConfirmId}`, { 
+        method: "DELETE",
+        body: { password: password.trim() } 
+      });
       load();
-      setDeleteConfirmId(null); // Đóng pop-up
+      setDeleteConfirmId(null);
+      setPassword("");
     } catch (error) {
-      alert("Lỗi khi xóa hóa đơn: " + (error.message || "Vui lòng thử lại sau."));
+      setDeleteErr(error.message || "Mật khẩu không đúng hoặc lỗi xóa hóa đơn.");
     } finally {
       setIsDeleting(false);
     }
@@ -128,33 +86,51 @@ export default function InvoiceList({ refreshKey = 0 }) {
 
   return (
     <section className="relative">
-      {/* POP-UP XÁC NHẬN XÓA (Z-INDEX 70) */}
+      {/* POP-UP XÁC NHẬN XÓA BẰNG MẬT KHẨU */}
       {deleteConfirmId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
+            <form onSubmit={handleExecuteDelete} className="p-6 text-center">
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50 shadow-inner">
-                <span className="text-3xl font-bold text-red-600">🗑️</span>
+                <span className="text-3xl font-bold text-red-600">🔒</span>
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận xóa</h3>
-              <p className="text-slate-600 mb-8 leading-relaxed text-sm">
-                Bạn có chắc chắn muốn xóa vĩnh viễn Hóa đơn <b className="text-slate-900">#{deleteConfirmId}</b> không? Hành động này sẽ xóa dữ liệu ở tất cả các trang và không thể hoàn tác.
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác thực mật khẩu</h3>
+              <p className="text-slate-600 mb-4 leading-relaxed text-sm">
+                Bạn đang yêu cầu xóa vĩnh viễn Hóa đơn <b className="text-slate-900">#{deleteConfirmId}</b>. Vui lòng nhập mật khẩu tài khoản để tiếp tục.
               </p>
+              
+              <div className="mb-4 text-left">
+                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Mật khẩu xác nhận</label>
+                <input 
+                  type="password" 
+                  placeholder="Nhập mật khẩu của bạn..." 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 shadow-sm"
+                  autoFocus
+                  required
+                />
+                {deleteErr && <p className="mt-1 text-xs text-red-600 font-medium">{deleteErr}</p>}
+              </div>
+
               <div className="flex gap-3 justify-center">
                 <button 
+                  type="button"
                   disabled={isDeleting}
                   onClick={() => setDeleteConfirmId(null)} 
                   className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors w-1/2">
                   Hủy bỏ
                 </button>
+
                 <button 
+                  type="submit"
                   disabled={isDeleting}
-                  onClick={executeDelete} 
-                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2 flex justify-center items-center">
-                  {isDeleting ? "Đang xử lý..." : "Đồng ý Xóa"}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2 flex items-center justify-center"
+                >
+                  {isDeleting ? "Đang xử lý..." : "Xác nhận Xóa"}
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
       )}

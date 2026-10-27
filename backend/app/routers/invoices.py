@@ -6,10 +6,11 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, Body
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.config import settings
 from app.database import get_db
@@ -193,26 +194,37 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
     return {"data": invoice_out(inv)}
 
 @router.delete("/{invoice_id}")
-async def delete_invoice(invoice_id: int, db: Session = Depends(get_db)):
-    # Tìm hóa đơn theo ID (hỗ trợ cả kiểu int hoặc string tùy database)
+async def delete_invoice(
+    invoice_id: int, 
+    payload: dict = Body(default={}), 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    password = payload.get("password")
+    
+    # 1. BẢO MẬT: Kiểm tra mật khẩu có được nhập hay không
+    if not password:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập mật khẩu xác nhận!")
+    
+    # 2. XÁC THỰC: Kiểm tra mật khẩu nhập vào có khớp với mật khẩu của user đang đăng nhập không
+    from app.security import verify_password
+    if not current_user or not verify_password(password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="Mật khẩu xác nhận không chính xác!")
+
+    # 3. Tìm hóa đơn theo ID hoặc invoice_id
     invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
     if not invoice:
-        # Thử tìm theo cột id nếu bảng dùng khóa chính tên là id
         invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
         
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
     
     try:
-        # Nếu model Invoice có cấu hình cascade delete thì chỉ cần db.delete(invoice)
-        # Nếu không, ta xóa các bảng con liên quan bằng cách an toàn không cần gọi trực tiếp tên class lạ:
-        for attr in ["journal_entries", "fields", "extracted_fields"]:
-            if hasattr(invoice, attr):
-                related_items = getattr(invoice, attr)
-                if related_items:
-                    for item in related_items:
-                        db.delete(item)
-        
+        # 4. Xóa các dữ liệu phụ thuộc ở các bảng liên quan để tránh lỗi khóa ngoại
+        db.execute(text("DELETE FROM invoice_fields WHERE invoice_id = :val"), {"val": invoice_id})
+        db.execute(text("DELETE FROM journal_entries WHERE invoice_id = :val"), {"val": invoice_id})
+
+        # 5. Xóa hóa đơn chính
         db.delete(invoice)
         db.commit()
         return {"message": "Xóa hóa đơn thành công", "invoice_id": invoice_id}
