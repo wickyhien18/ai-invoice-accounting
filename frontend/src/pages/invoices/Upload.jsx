@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, uploadWithProgress } from "../../api/client.js";
 import InvoiceList from "./InvoiceList.jsx";
+import { creep } from "./smoothProgress.js";
 
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.xml";
 const MAX_MB = 10;
@@ -31,6 +32,7 @@ export default function Upload() {
   async function watch(id, invoiceId) {
     const t0 = Date.now();
     let fails = 0;
+    let shown = 0;   // phan tram (0-100 cua giai doan doc) dang hien, de thanh nhich dan giua cac moc
     while (alive.current && Date.now() - t0 < POLL_LIMIT_MS) {
       try {
         const { data } = await api(`/api/invoices/${invoiceId}/progress`);
@@ -45,7 +47,8 @@ export default function Upload() {
           setRefreshKey((k) => k + 1);
           return;
         }
-        patch(id, { state: "dang_doc", percent: UPLOAD_SHARE + Math.round((data.percent * (100 - UPLOAD_SHARE)) / 100), stage: data.stage });
+        shown = creep(shown, data.percent);
+        patch(id, { state: "dang_doc", percent: UPLOAD_SHARE + Math.round((shown * (100 - UPLOAD_SHARE)) / 100), stage: data.stage });
       } catch {
         if (++fails >= 5) break;
       }
