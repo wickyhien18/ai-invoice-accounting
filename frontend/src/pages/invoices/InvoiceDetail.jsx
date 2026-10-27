@@ -123,9 +123,9 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
               ))}
             </dl>
             <div className="mb-4 flex flex-wrap gap-2">
-              <button disabled={busy} onClick={openFile} className="rounded border px-3 py-1 text-sm">Xem file gốc</button>
+              <button disabled={busy} onClick={openFile} className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Xem file gốc</button>
               {["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
-                <button disabled={busy} onClick={reprocess} className="rounded border px-3 py-1 text-sm">Xử lý lại</button>
+                <button disabled={busy} onClick={reprocess} className="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">Xử lý lại</button>
               )}
             </div>
             {inv.status === "loi_xu_ly" && (
