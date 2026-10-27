@@ -7,6 +7,7 @@ import httpx
 from app.config import settings
 
 log = logging.getLogger(__name__)
+EXTRACT_TIMEOUT = 600  # giay
 
 
 class AIServiceError(RuntimeError):
@@ -18,7 +19,9 @@ def extract_invoice(path: Path, filename: str) -> dict:
     try:
         with open(path, "rb") as f:
             r = httpx.post(f"{settings.ai_service_url}/extract", files={"file": (filename, f)},
-                           data={"job_id": path.name}, timeout=180)   # job_id = ten file da luu, de hoi tien do
+                           data={"job_id": path.name},   # job_id = ten file da luu, de hoi tien do
+                           # ai-service doc anh lan luot nen hoa don xep hang cuoi phai cho lau: cho toi da 10 phut
+                           timeout=httpx.Timeout(EXTRACT_TIMEOUT, connect=10))
     except httpx.HTTPError as e:
         raise AIServiceError(f"Không gọi được dịch vụ AI: {e}") from e
     if r.status_code != 200:

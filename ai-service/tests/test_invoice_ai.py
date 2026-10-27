@@ -315,3 +315,77 @@ def test_extract_reports_progress_by_job_id():
     assert r.status_code == 200
     p = client.get("/progress/job-1").json()["data"]
     assert p["percent"] == 95 and p["stage"]
+
+
+def test_paddle_error_retries_then_succeeds(monkeypatch):
+    """Loi C++ cua Paddle o mot anh: thu lai anh thu nho / engine du phong thay vi bao hong ngay."""
+    from PIL import Image
+    calls = []
+
+    class Eng:
+        def __init__(self, fail_first):
+            self.fail_first = fail_first
+
+        def predict(self, arr):
+            calls.append(arr.shape)
+            if self.fail_first and len(calls) <= self.fail_first:
+                raise RuntimeError("vector<bool>::_M_range_check: __n (which is 81) >= this->size() (which is 79)")
+            return [{"rec_texts": ["So: 1"], "rec_scores": [0.9], "rec_polys": [[[0, 0], [10, 0], [10, 5], [0, 5]]]}]
+
+    img = Image.new("RGB", (200, 100), "white")
+    monkeypatch.setattr(ocr, "_engine", lambda: Eng(1))
+    assert [i.text for i in ocr._paddle_items(img)] == ["So: 1"]
+    assert calls[0] == (100, 200, 3) and calls[1] == (85, 170, 3)        # lan 2 la anh thu nho
+
+    calls.clear()
+    monkeypatch.setattr(ocr, "_engine", lambda: Eng(2))
+    monkeypatch.setattr(ocr, "_plain_engine", lambda: Eng(0))
+    assert len(ocr._paddle_items(img)) == 1                                # lan 3 dung engine du phong
+
+    monkeypatch.setattr(ocr, "_engine", lambda: Eng(9))
+    monkeypatch.setattr(ocr, "_plain_engine", lambda: Eng(9))
+    with pytest.raises(ocr.OCRUnavailable, match="_M_range_check"):        # het cach thi moi bao loi
+        ocr._paddle_items(img)
+
+
+def test_ocr_runs_one_image_at_a_time(monkeypatch):
+    """Nhieu hoa don xu ly cung luc: PaddleOCR chi duoc phep doc MOT anh tai mot thoi diem."""
+    import threading
+    import time
+    from PIL import Image
+    state = {"now": 0, "max": 0}
+    guard = threading.Lock()
+
+    class Eng:
+        def predict(self, arr):
+            with guard:
+                state["now"] += 1
+                state["max"] = max(state["max"], state["now"])
+            time.sleep(0.05)
+            with guard:
+                state["now"] -= 1
+            return []
+
+    monkeypatch.setattr(ocr, "_engine", lambda: Eng())
+    img = Image.new("RGB", (50, 50), "white")
+    ts = [threading.Thread(target=ocr._paddle_items, args=(img,)) for _ in range(5)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert state["max"] == 1
+
+
+def test_on_start_hook_called_when_image_really_starts(monkeypatch):
+    from PIL import Image
+    seen = []
+
+    class Eng:
+        def predict(self, arr):
+            seen.append("predict")
+            return []
+
+    token = ocr.ON_START.set(lambda: seen.append("start"))
+    try:
+        ocr._read(Eng(), Image.new("RGB", (20, 20), "white"))
+    finally:
+        ocr.ON_START.reset(token)
+    assert seen == ["start", "predict"] and not ocr.is_busy()

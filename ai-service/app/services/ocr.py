@@ -9,6 +9,7 @@ import os
 import statistics
 import threading
 import time
+from contextvars import ContextVar
 from dataclasses import dataclass
 
 from PIL import Image
@@ -17,6 +18,8 @@ from app.services.preprocess import preprocess
 
 log = logging.getLogger(__name__)
 _ENGINE = None
+# Ham goi MOT LAN ngay khi anh bat dau duoc doc that (da toi luot, het cho). Router dung de bao tien do.
+ON_START: ContextVar = ContextVar("ocr_on_start", default=None)
 
 
 class OCRUnavailable(RuntimeError):
@@ -116,12 +119,42 @@ def _poly_box(poly):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _paddle_items(img: Image.Image) -> list[Item]:
+_PLAIN = None
+
+
+def _plain_engine():
+    """Engine DU PHONG, tat cac buoc phu (xoay dong chu, xoay/nan tai lieu) de tranh loi C++ cua Paddle o mot so anh."""
+    global _PLAIN
+    if _PLAIN is not None:
+        return _PLAIN
+    with _LOCK:
+        if _PLAIN is None:
+            from paddleocr import PaddleOCR
+            lang = os.getenv("OCR_LANG", "vi")
+            try:
+                _PLAIN = PaddleOCR(lang=lang, use_textline_orientation=False, use_doc_orientation_classify=False,
+                                   use_doc_unwarping=False)                                # 3.x
+            except (TypeError, ValueError):
+                _PLAIN = PaddleOCR(lang=lang, use_angle_cls=False, show_log=False)         # 2.x
+    return _PLAIN
+
+
+_INFER_LOCK = threading.Lock()   # PaddleOCR KHONG an toan khi nhieu luong cung doc: cho tung anh doc lan luot
+
+
+def is_busy() -> bool:
+    """True neu dang co anh khac duoc doc (anh moi vao se phai xep hang)."""
+    return _INFER_LOCK.locked()
+
+
+def _read(eng, img: Image.Image) -> list[Item]:
     import numpy as np
-    eng = _engine()
     arr = np.asarray(img.convert("RGB"))
     items: list[Item] = []
-    try:
+    with _INFER_LOCK:
+        cb = ON_START.get()
+        if cb:
+            cb()
         if hasattr(eng, "predict"):                   # PaddleOCR 3.x
             for res in eng.predict(arr):
                 polys = res.get("rec_polys") if res.get("rec_polys") is not None else res.get("dt_polys")
@@ -131,9 +164,28 @@ def _paddle_items(img: Image.Image) -> list[Item]:
             for page in eng.ocr(arr, cls=True) or []:
                 for poly, (t, s) in page or []:
                     items.append(Item(t, *_poly_box(poly), float(s) * 100))
-    except Exception as e:
-        raise OCRUnavailable(f"PaddleOCR loi khi doc anh: {e}") from e
     return items
+
+
+def _paddle_items(img: Image.Image) -> list[Item]:
+    """Doc anh bang PaddleOCR. Paddle 3.x doi khi nem loi C++ ('vector<bool>::_M_range_check') o mot so anh cu the,
+    nen neu loi thi thu lai: (1) thu nho anh 15% (doi so o chu tim thay), (2) engine du phong tat cac buoc phu."""
+    eng = _engine()
+    w, h = img.size
+    attempts = (("anh goc", lambda: _read(eng, img)),
+                ("anh thu nho 85%", lambda: _read(eng, img.resize((round(w * 0.85), round(h * 0.85)), Image.LANCZOS))),
+                ("engine du phong", lambda: _read(_plain_engine(), img)))
+    last: Exception | None = None
+    for name, run in attempts:
+        try:
+            items = run()
+            if last is not None:
+                log.warning("PaddleOCR da doc duoc o lan thu lai (%s) sau loi: %s", name, last)
+            return items
+        except Exception as e:
+            log.warning("PaddleOCR loi o %s: %s", name, e)
+            last = e
+    raise OCRUnavailable(f"PaddleOCR loi khi doc anh: {last}") from last
 
 
 def ocr_image(img: Image.Image, do_preprocess: bool = True) -> list[dict]:

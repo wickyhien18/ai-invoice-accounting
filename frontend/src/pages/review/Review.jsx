@@ -15,7 +15,17 @@ const LEVEL = {
   green: { text: "Cao", chip: "bg-green-100 text-green-800", bar: "border-l-green-500" },
   yellow: { text: "Trung bình", chip: "bg-amber-100 text-amber-800", bar: "border-l-amber-500" },
   red: { text: "Thấp", chip: "bg-red-100 text-red-800", bar: "border-l-red-500" },
+  unknown: { text: "Chưa rõ", chip: "bg-slate-200 text-slate-700", bar: "border-l-slate-400" },
 };
+
+// Mức tin cậy của một trường. Server không gửi / gửi giá trị lạ (null, "high"...) thì tính từ điểm (xanh >= 90, vàng >= 70, còn lại đỏ);
+// không có cả điểm thì là "unknown". Trước đây tra thẳng LEVEL[f.confidence_level] nên gặp giá trị lạ là cả trang sập (lv.bar của undefined).
+function levelOf(f) {
+  if (f.confidence_level !== "unknown" && LEVEL[f.confidence_level]) return f.confidence_level;
+  const s = f.confidence_score;
+  if (s == null || Number.isNaN(Number(s))) return "unknown";
+  return s >= 90 ? "green" : s >= 70 ? "yellow" : "red";
+}
 const SPLIT_KEY = "review.split";
 const SPLIT_MIN = 25, SPLIT_MAX = 75;
 
@@ -83,7 +93,9 @@ function FieldRow({ f, editable, onSave }) {
   useEffect(() => setDraft(f.value ?? ""), [f.value, f.field_id]);
 
   const dirty = draft.trim() !== (f.value ?? "");
-  const lv = LEVEL[f.confidence_level];
+  const lv = LEVEL[levelOf(f)];
+  
+  // Ép viết hoa với những trường thông tin tên, mã số, ký hiệu để chống lỗi font
   const isUpper = ["seller_name", "invoice_series", "mst_seller"].includes(f.field_name);
 
   async function commit(val) {
@@ -184,10 +196,11 @@ export default function Review() {
   if (err) return <p className="text-sm text-red-600">{err} <button className="text-blue-700 underline" onClick={() => setParams({})}>← Trở về danh sách</button></p>;
   if (!info) return <div className="p-8 text-center text-slate-500 font-medium">Đang tải dữ liệu hóa đơn...</div>;
 
-  const { inv, fields, editable, checks } = info;
+  const { inv, editable, checks } = info;
+  const fields = info.fields || [];
   // Tính toán số trường chưa được xác nhận
-  const todo = fields.filter((f) => f.confidence_level !== "green" && !f.confirmed).length;
-
+  const todo = fields.filter((f) => levelOf(f) !== "green" && !f.confirmed).length;
+ 
   // Xử lý logic chặn khi bấm "Tiếp: Định khoản"
   const handleNextStep = () => {
     if (todo > 0) {
@@ -196,6 +209,7 @@ export default function Review() {
       navigate(`/entries?id=${inv.invoice_id}`);
     }
   };
+
 
   return (
     <section>
