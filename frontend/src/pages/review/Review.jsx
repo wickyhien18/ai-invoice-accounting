@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom"; 
 import { api, fetchBlobUrl } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { FILE_TYPE } from "../invoices/format.js";
@@ -18,8 +18,6 @@ const LEVEL = {
   unknown: { text: "Chưa rõ", chip: "bg-slate-200 text-slate-700", bar: "border-l-slate-400" },
 };
 
-// Mức tin cậy của một trường. Server không gửi / gửi giá trị lạ (null, "high"...) thì tính từ điểm (xanh >= 90, vàng >= 70, còn lại đỏ);
-// không có cả điểm thì là "unknown". Trước đây tra thẳng LEVEL[f.confidence_level] nên gặp giá trị lạ là cả trang sập (lv.bar của undefined).
 function levelOf(f) {
   if (f.confidence_level !== "unknown" && LEVEL[f.confidence_level]) return f.confidence_level;
   const s = f.confidence_score;
@@ -41,7 +39,6 @@ function Viewer({ invoiceId, fileType, frozen }) {
   const [text, setText] = useState(null);
   const [err, setErr] = useState("");
   
-  // QoL 2: Thêm tính năng Zoom nâng cao và Xoay ảnh
   const [zoom, setZoom] = useState(1);
   const [rotate, setRotate] = useState(0);
 
@@ -65,7 +62,6 @@ function Viewer({ invoiceId, fileType, frozen }) {
   }
   return (
     <div className="flex h-full flex-col">
-      {/* QoL 2: Toolbar giao diện mới */}
       <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-3 py-2 text-sm shadow-sm z-10">
         <div className="flex items-center bg-white border rounded shadow-sm">
           <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-r" onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.25).toFixed(2)))} aria-label="Thu nhỏ">−</button>
@@ -103,7 +99,6 @@ function FieldRow({ f, editable, onSave }) {
   const dirty = draft.trim() !== (f.value ?? "");
   const lv = LEVEL[levelOf(f)];
   
-  // Ép viết hoa với những trường thông tin tên, mã số, ký hiệu để chống lỗi font
   const isUpper = ["seller_name", "invoice_series", "mst_seller"].includes(f.field_name);
 
   async function commit(val) {
@@ -169,11 +164,15 @@ function Checks({ c }) {
 export default function Review() {
   const [params, setParams] = useSearchParams();
   const id = params.get("id");
+  const navigate = useNavigate(); 
   const [info, setInfo] = useState(null);
   const [err, setErr] = useState("");
   const [split, setSplit] = useState(loadSplit);
   const [dragging, setDragging] = useState(false);
   const box = useRef(null);
+
+  const [showRedModal, setShowRedModal] = useState(false);
+  const [showYellowModal, setShowYellowModal] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(SPLIT_KEY, String(split)); } catch { /* bi chan: bo qua */ } }, [split]);
 
@@ -206,16 +205,95 @@ export default function Review() {
 
   const { inv, editable, checks } = info;
   const fields = info.fields || [];
+  
+  const unconfirmedFields = fields.filter((f) => !f.confirmed);
+  const hasRed = unconfirmedFields.some(f => levelOf(f) === "red");
+  const hasYellow = unconfirmedFields.some(f => levelOf(f) === "yellow" || levelOf(f) === "unknown");
   const todo = fields.filter((f) => levelOf(f) !== "green" && !f.confirmed).length;
+
+  const handleNextStep = () => {
+    if (hasRed) {
+      setShowRedModal(true);
+      return;
+    }
+    
+    if (hasYellow) {
+      setShowYellowModal(true);
+      return;
+    }
+
+    navigate(`/entries?id=${inv.invoice_id}`);
+  };
+
   return (
-    <section>
+    <section className="relative">
+
+      {/* POP-UP LỖI NGHIÊM TRỌNG (ĐỎ) - TRẢ VỀ STYLE CHUẨN */}
+      {showRedModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50 shadow-inner">
+                <span className="text-3xl font-bold text-red-600">✕</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Cảnh báo nghiêm trọng</h3>
+              <p className="text-slate-600 mb-6 leading-relaxed text-sm">
+                Vẫn còn trường dữ liệu có độ tin cậy <b className="text-red-600">THẤP (Đỏ)</b> chưa được xác nhận. Vui lòng tự gõ sửa lại hoặc bấm <b>'✓ Đúng'</b> trước khi đi tiếp để tránh sai sót định khoản!
+              </p>
+              <div className="flex justify-center">
+                <button 
+                  onClick={() => setShowRedModal(false)} 
+                  className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors shadow-md w-full">
+                  Đã hiểu & Quay lại sửa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POP-UP CẢNH BÁO XÁC NHẬN (VÀNG) - TRẢ VỀ STYLE CHUẨN */}
+      {showYellowModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-amber-50 shadow-inner">
+                <span className="text-3xl font-bold text-amber-600">!</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận chuyển trang</h3>
+              <p className="text-slate-600 mb-8 leading-relaxed text-sm">
+                Vẫn còn một số trường dữ liệu chưa được xác nhận (độ tin cậy <b className="text-amber-600">Trung bình</b>). Bạn có chắc chắn thông tin trên hóa đơn đã chính xác 100% để tiếp tục sang Định khoản?
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button 
+                  onClick={() => setShowYellowModal(false)} 
+                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg font-bold transition-colors w-1/2">
+                  Hủy bỏ
+                </button>
+                <button 
+                  onClick={() => { setShowYellowModal(false); navigate(`/entries?id=${inv.invoice_id}`); }} 
+                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2">
+                  Tiếp tục
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
         <button className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" onClick={() => setParams({})}>← Trở lại</button>
         <div className="w-px h-4 bg-slate-300 mx-1"></div>
         <h1 className="text-xl font-bold text-slate-800">Hóa đơn #{inv.invoice_id}</h1>
         <StatusBadge status={inv.status} />
         <span className="text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
-        <Link to={`/entries?id=${inv.invoice_id}`} className="ml-auto rounded-lg bg-blue-600 hover:bg-blue-700 px-4 py-1.5 text-white font-medium shadow-sm transition-colors">Tiếp: Định khoản →</Link>
+        
+        <button 
+          onClick={handleNextStep}
+          className={`ml-auto rounded-lg px-4 py-1.5 font-medium shadow-sm transition-colors ${hasRed ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+        >
+          Tiếp: Định khoản →
+        </button>
       </div>
       {!editable && (
         <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 font-medium flex items-center gap-2">
