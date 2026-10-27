@@ -69,15 +69,9 @@ function Viewer({ invoiceId, fileType, frozen }) {
           <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-l" onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))} aria-label="Phóng to">+</button>
         </div>
         <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm" onClick={() => {setZoom(1); setRotate(0);}}>Vừa khung</button>
-        
         <div className="w-px h-5 bg-slate-300 mx-1"></div>
-        
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r - 90)}>
-          ↺ Xoay trái
-        </button>
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r + 90)}>
-          ↻ Xoay phải
-        </button>
+        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r - 90)}>↺ Xoay trái</button>
+        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r + 90)}>↻ Xoay phải</button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto bg-slate-200 relative">
         <div className="flex min-h-full items-center justify-center p-4">
@@ -110,8 +104,7 @@ function FieldRow({ f, editable, onSave }) {
     <li className={`border-l-4 ${lv.bar} rounded border bg-white p-3 shadow-sm hover:shadow transition-shadow`}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <label htmlFor={id} className="text-sm font-bold text-slate-700">{LABEL[f.field_name] || f.field_name}</label>
-        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${lv.chip}`}
-          title="Xanh ≥ 90, vàng 70 đến dưới 90, đỏ dưới 70">
+        <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${lv.chip}`} title="Xanh ≥ 90, vàng 70 đến dưới 90, đỏ dưới 70">
           Độ tin cậy {lv.text}{f.confidence_score == null ? "" : ` · ${Math.round(f.confidence_score)}%`}
         </span>
         {f.edited && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-800 font-medium">Đã sửa</span>}
