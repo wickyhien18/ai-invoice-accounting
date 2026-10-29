@@ -115,12 +115,114 @@ function XmlNode({ n }) {
   );
 }
 
-function XmlView({ text, zoom, raw }) {
-  let root = null;
-  if (!raw) {
-    const doc = new DOMParser().parseFromString(text, "application/xml");
-    if (!doc.querySelector("parsererror")) root = [...doc.childNodes].filter((c) => c.nodeType === 1 || c.nodeType === 8);
-  }
+// --- XML: hien thi giong trang tra cuu hoa don dien tu (tieu de, ben ban/ben mua, bang hang hoa, tong tien) ---
+// Doc theo ten the (bo namespace) de chay duoc ca file that lan file mo phong.
+const ln = (n) => n.localName || n.nodeName.replace(/^.*:/, "");
+const kids = (n, name) => [...n.children].filter((c) => ln(c) === name);
+const pick = (n, ...path) => path.reduce((cur, name) => (cur ? kids(cur, name)[0] || null : null), n);
+const val = (n, ...path) => { const e = pick(n, ...path); return e ? e.textContent.trim() : ""; };
+const numVN = (v) => (v === "" || isNaN(Number(v)) ? v : new Intl.NumberFormat("vi-VN").format(Number(v)));
+const dateVN = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v); return m ? `${m[3]}/${m[2]}/${m[1]}` : v; };
+
+function Party({ title, p }) {
+  const rows = [["Tên đơn vị", val(p, "Ten")], ["Mã số thuế", val(p, "MST")], ["Địa chỉ", val(p, "DChi")]];
+  return (
+    <div style={{ marginTop: "0.9em" }}>
+      <div style={{ fontWeight: 700, borderBottom: "1px solid #94a3b8", paddingBottom: 2, marginBottom: 4 }}>{title}</div>
+      {rows.filter(([, v]) => v).map(([k, v]) => (
+        <div key={k} style={{ display: "flex", gap: 8, padding: "1px 0" }}>
+          <span style={{ width: "7.5em", flexShrink: 0, color: "#475569" }}>{k}:</span>
+          <span style={{ fontWeight: k === "Tên đơn vị" ? 700 : 400, wordBreak: "break-word" }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InvoiceView({ doc, zoom }) {
+  const root = doc.documentElement;
+  const dl = pick(root, "DLHDon") || root;
+  const tt = pick(dl, "TTChung"), nd = pick(dl, "NDHDon") || dl;
+  const seller = pick(nd, "NBan"), buyer = pick(nd, "NMua"), tot = pick(nd, "TToan");
+  const items = (pick(nd, "DSHHDVu") ? kids(pick(nd, "DSHHDVu"), "HHDVu") : []);
+  const title = (tt && val(tt, "THDon")) || "Hóa đơn";
+  const mccqt = val(root, "MCCQT");
+  const th = { border: "1px solid #94a3b8", padding: "4px 6px", background: "#e2e8f0", fontWeight: 700, textAlign: "center" };
+  const td = { border: "1px solid #cbd5e1", padding: "4px 6px", verticalAlign: "top" };
+  const num = { ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" };
+  const meta = tt ? [["Ký hiệu mẫu số", val(tt, "KHMSHDon")], ["Ký hiệu", val(tt, "KHHDon")], ["Số", val(tt, "SHDon")]].filter(([, v]) => v) : [];
+  const sums = tot ? [["Cộng tiền hàng (chưa thuế)", val(tot, "TgTCThue")], ["Tiền thuế GTGT", val(tot, "TgTThue")]].filter(([, v]) => v) : [];
+  const total = tot ? val(tot, "TgTTTBSo") : "";
+  const words = tot ? val(tot, "TgTTTBChu") : "";
+  const cur = tt ? val(tt, "DVTTe") : "";
+  return (
+    // nen giay trang co dinh (khong doi theo che do toi) de giong hoa don that
+    <div style={{ background: "#fff", color: "#0f172a", fontSize: 14 * zoom, lineHeight: 1.5, padding: "1.2em 1.4em", borderRadius: 2, boxShadow: "0 1px 4px rgba(0,0,0,.25)" }}>
+      <div style={{ textAlign: "center", marginBottom: "0.8em" }}>
+        <div style={{ fontSize: "1.4em", fontWeight: 800, textTransform: "uppercase", color: "#1e3a8a" }}>{title}</div>
+        {tt && val(tt, "NLap") && <div style={{ fontStyle: "italic" }}>Ngày lập: {dateVN(val(tt, "NLap"))}</div>}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0 1.4em", marginTop: 4 }}>
+          {meta.map(([k, v]) => <span key={k}>{k}: <b>{v}</b></span>)}
+        </div>
+        {mccqt && <div style={{ marginTop: 4, color: "#475569" }}>Mã của cơ quan thuế: <b style={{ color: "#0f172a" }}>{mccqt}</b></div>}
+      </div>
+
+      {seller && <Party title="Người bán" p={seller} />}
+      {buyer && <Party title="Người mua" p={buyer} />}
+      {tt && (val(tt, "HTTToan") || cur) && (
+        <div style={{ marginTop: "0.6em", color: "#475569" }}>
+          {val(tt, "HTTToan") && <>Hình thức thanh toán: <b style={{ color: "#0f172a" }}>{val(tt, "HTTToan")}</b></>}
+          {val(tt, "HTTToan") && cur && " · "}
+          {cur && <>Đồng tiền: <b style={{ color: "#0f172a" }}>{cur}</b></>}
+        </div>
+      )}
+
+      <div style={{ overflowX: "auto", marginTop: "0.9em" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.93em" }}>
+          <thead>
+            <tr>{["STT", "Tên hàng hóa, dịch vụ", "ĐVT", "Số lượng", "Đơn giá", "Thành tiền", "Thuế suất"].map((h) => <th key={h} style={th}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i}>
+                <td style={{ ...td, textAlign: "center" }}>{val(it, "STT") || i + 1}</td>
+                <td style={td}>{val(it, "THHDVu")}</td>
+                <td style={{ ...td, textAlign: "center" }}>{val(it, "DVTinh")}</td>
+                <td style={num}>{numVN(val(it, "SLuong"))}</td>
+                <td style={num}>{numVN(val(it, "DGia"))}</td>
+                <td style={num}>{numVN(val(it, "ThTien"))}</td>
+                <td style={{ ...td, textAlign: "center" }}>{val(it, "TSuat")}</td>
+              </tr>
+            ))}
+            {items.length === 0 && <tr><td colSpan={7} style={{ ...td, textAlign: "center", color: "#64748b" }}>Không có dòng hàng hóa, dịch vụ</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: "0.8em", marginLeft: "auto", maxWidth: "26em" }}>
+        {sums.map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "2px 0" }}>
+            <span>{k}:</span><span style={{ fontVariantNumeric: "tabular-nums" }}>{numVN(v)}</span>
+          </div>
+        ))}
+        {total && (
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "4px 0", marginTop: 2, borderTop: "2px solid #1e3a8a", fontWeight: 800, fontSize: "1.08em" }}>
+            <span>Tổng thanh toán:</span><span style={{ fontVariantNumeric: "tabular-nums" }}>{numVN(total)}{cur ? ` ${cur}` : ""}</span>
+          </div>
+        )}
+      </div>
+      {words && <div style={{ marginTop: "0.5em" }}>Số tiền viết bằng chữ: <i style={{ fontWeight: 600 }}>{words}</i></div>}
+    </div>
+  );
+}
+
+function XmlView({ text, zoom, view }) {
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  const ok = !doc.querySelector("parsererror");
+  const isInvoice = ok && ln(doc.documentElement) === "HDon";
+  const mode = view === "invoice" && !isInvoice ? "tree" : view;
+  if (mode === "invoice") return <InvoiceView doc={doc} zoom={zoom} />;
+  const root = ok && mode === "tree" ? [...doc.childNodes].filter((c) => c.nodeType === 1 || c.nodeType === 8) : null;
   return (
     <div className="mx-auto min-h-full w-full rounded-sm bg-white p-4 font-mono shadow-md" style={{ fontSize: 13 * zoom, lineHeight: 1.6 }}>
       {root ? root.map((n, i) => <XmlNode key={i} n={n} />) : <pre className="whitespace-pre-wrap break-all">{text}</pre>}
@@ -132,13 +234,13 @@ export default function FileViewer({ invoiceId, fileType, filename }) {
   const [state, setState] = useState({ status: "load" });   // load | err | ready
   const [zoom, setZoom] = useState(1);
   const [rot, setRot] = useState(0);
-  const [raw, setRaw] = useState(false);
+  const [view, setView] = useState("invoice");   // invoice | tree | raw (chi XML)
   const [width, setWidth] = useState(0);
   const area = useRef(null);
 
   useEffect(() => {
     let dead = false, url = null;
-    setState({ status: "load" }); setZoom(1); setRot(0); setRaw(false);
+    setState({ status: "load" }); setZoom(1); setRot(0); setView("invoice");
     (async () => {
       try {
         url = await fetchBlobUrl(`/api/invoices/${invoiceId}/file`);
@@ -193,11 +295,16 @@ export default function FileViewer({ invoiceId, fileType, filename }) {
     <div className="flex h-full flex-col bg-white">
       <Toolbar label={label} zoom={zoom} setZoom={setZoom} rot={rot} setRot={isXml ? null : setRot}
         extra={isXml && (
-          <button type="button" className={btn} onClick={() => setRaw((v) => !v)}>{raw ? "Xem dạng cây" : "Xem bản gốc"}</button>
+          <div className="flex items-center gap-1" role="group" aria-label="Kiểu hiển thị XML">
+            {[["invoice", "Dạng hóa đơn"], ["tree", "Dạng cây"], ["raw", "Bản gốc"]].map(([k, t]) => (
+              <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}
+                className={view === k ? "rounded border border-blue-600 bg-blue-600 px-2 py-1 text-sm font-medium text-white" : btn}>{t}</button>
+            ))}
+          </div>
         )} />
       <div ref={area} className="min-h-0 flex-1 overflow-auto bg-slate-200 p-3">
         {isXml
-          ? <XmlView text={state.text} zoom={zoom} raw={raw} />
+          ? <XmlView text={state.text} zoom={zoom} view={view} />
           : <div className="space-y-3">{state.items.map((it, i) => <CanvasPage key={i} item={it} width={width * zoom} rot={rot} />)}</div>}
       </div>
     </div>

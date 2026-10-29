@@ -1,50 +1,33 @@
 import React, { useState, useEffect } from "react";
-import { api, fetchBlobUrl } from "../../api/client.js";
+import { api } from "../../api/client.js";
 import Pagination from "../../components/Pagination.jsx";
+import FileViewer from "../review/FileViewer.jsx";
 
 // Cửa sổ đối chiếu nhanh dành cho Kế toán trưởng
 const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
   const [inv, setInv] = useState(null);
   const [entries, setEntries] = useState(null);
-  const [fileSrc, setFileSrc] = useState(null);
-  const [xmlText, setXmlText] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let dead = false;
-    let url = null;
     setLoading(true);
 
+    // File goc do FileViewer tu tai (anh / PDF / XML dang hoa don), o day chi lay du lieu va but toan
     Promise.all([
       api(`/api/invoices/${invoiceId}`),
       api(`/api/invoices/${invoiceId}/journal-entries`).catch(() => ({ data: [] })),
-      fetchBlobUrl(`/api/invoices/${invoiceId}/file`).catch(() => null)
-    ]).then(async ([invRes, entriesRes, blobUrl]) => {
-      if (dead) {
-        if (blobUrl) URL.revokeObjectURL(blobUrl);
-        return;
-      }
-      
+    ]).then(([invRes, entriesRes]) => {
+      if (dead) return;
       setInv(invRes.data);
       setEntries(entriesRes.data || []);
-      url = blobUrl;
-      
-      if (invRes.data.file_type === "xml" && blobUrl) {
-        const txt = await (await fetch(blobUrl)).text();
-        setXmlText(txt);
-      } else {
-        setFileSrc(blobUrl);
-      }
       setLoading(false);
     }).catch(err => {
       console.error("Lỗi tải chi tiết:", err);
-      setLoading(false);
+      if (!dead) setLoading(false);
     });
 
-    return () => {
-      dead = true;
-      if (url) URL.revokeObjectURL(url);
-    };
+    return () => { dead = true; };
   }, [invoiceId]);
 
   if (loading) return (
@@ -81,18 +64,8 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
       </div>
       
       <div className="flex flex-1 overflow-hidden">
-         <div className="w-1/2 border-r border-slate-300 bg-slate-200 flex flex-col relative">
-            <div className="absolute top-0 left-0 right-0 bg-white/90 backdrop-blur-sm p-2 text-sm font-semibold text-slate-700 border-b z-10 flex justify-between shadow-sm">
-              <span>📄 File gốc ({inv.file_type?.toUpperCase()})</span>
-              <span className="text-slate-500 font-normal truncate max-w-[60%]">{inv.filename}</span>
-            </div>
-            <div className="flex-1 overflow-auto pt-11 bg-white">
-              {xmlText ? <pre className="p-4 text-xs bg-white min-h-full whitespace-pre-wrap break-all">{xmlText}</pre> :
-               fileSrc && inv.file_type === "pdf" ? <iframe src={fileSrc} className="w-full h-full bg-white" title="PDF Viewer" /> :
-               fileSrc ? <img src={fileSrc} className="max-w-full m-auto block bg-white shadow-sm" alt="Invoice" /> :
-               <div className="p-4 text-slate-500 flex h-full items-center justify-center bg-white">Không tải được file gốc</div>
-              }
-            </div>
+         <div className="w-1/2 border-r border-slate-300 bg-slate-200 flex flex-col">
+            <FileViewer invoiceId={inv.invoice_id} fileType={inv.file_type} filename={inv.filename} />
          </div>
 
          <div className="w-1/2 bg-white p-8 overflow-y-auto">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { api, fetchBlobUrl } from "../../api/client.js";
+import { api } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { FILE_TYPE } from "../invoices/format.js";
 import InvoicePicker from "./InvoicePicker.jsx";
@@ -33,56 +33,6 @@ function loadSplit() {
     const v = Number(localStorage.getItem(SPLIT_KEY));
     return v >= SPLIT_MIN && v <= SPLIT_MAX ? v : 50;
   } catch { return 50; }
-}
-
-function Viewer({ invoiceId, fileType, frozen }) {
-  const [src, setSrc] = useState(null);
-  const [text, setText] = useState(null);
-  const [err, setErr] = useState("");
-  
-  const [zoom, setZoom] = useState(1);
-  const [rotate, setRotate] = useState(0);
-
-  useEffect(() => {
-    let dead = false, url = null;
-    setSrc(null); setText(null); setErr(""); setZoom(1); setRotate(0);
-    fetchBlobUrl(`/api/invoices/${invoiceId}/file`).then(async (u) => {
-      url = u;
-      if (dead) return URL.revokeObjectURL(u);
-      if (fileType === "xml") setText(await (await fetch(u)).text());
-      else setSrc(u);
-    }).catch((e) => !dead && setErr(e.message));
-    return () => { dead = true; if (url) URL.revokeObjectURL(url); };
-  }, [invoiceId, fileType]);
-
-  if (err) return <p className="p-4 text-sm text-red-600">Không mở được file gốc: {err}</p>;
-  if (!src && text === null) return <p className="p-4 text-sm text-slate-500">Đang tải file gốc…</p>;
-  if (text !== null) return <pre className="h-full overflow-auto whitespace-pre-wrap break-all p-3 text-xs">{text}</pre>;
-  if (fileType === "pdf") {
-    return <iframe title="Hóa đơn gốc (PDF)" src={src} className={`h-full w-full ${frozen ? "pointer-events-none" : ""}`} />;
-  }
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-3 py-2 text-sm shadow-sm z-10">
-        <div className="flex items-center bg-white border rounded shadow-sm">
-          <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-r" onClick={() => setZoom((z) => Math.max(0.25, +(z - 0.25).toFixed(2)))} aria-label="Thu nhỏ">−</button>
-          <span className="w-14 text-center tabular-nums font-medium text-slate-700">{Math.round(zoom * 100)}%</span>
-          <button className="px-2.5 py-1 hover:bg-slate-100 text-slate-700 border-l" onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))} aria-label="Phóng to">+</button>
-        </div>
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm" onClick={() => {setZoom(1); setRotate(0);}}>Vừa khung</button>
-        <div className="w-px h-5 bg-slate-300 mx-1"></div>
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r - 90)}>↺ Xoay trái</button>
-        <button className="rounded border bg-white px-3 py-1 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-1" onClick={() => setRotate((r) => r + 90)}>↻ Xoay phải</button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto bg-slate-200 relative">
-        <div className="flex min-h-full items-center justify-center p-4">
-          <img src={src} alt="Hóa đơn gốc" 
-               style={{ width: `${zoom * 100}%`, maxWidth: "none", transform: `rotate(${rotate}deg)`, transition: "transform 0.2s ease-in-out" }} 
-               className="block shadow-md bg-white" />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function FieldRow({ f, editable, onSave }) {
@@ -118,7 +68,7 @@ function FieldRow({ f, editable, onSave }) {
             if (e.key === "Enter") e.currentTarget.blur();
             if (e.key === "Escape") setDraft(f.value ?? "");
           }}
-          className={`w-full rounded border p-2 text-sm disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${isUpper ? 'uppercase font-semibold text-slate-900' : 'text-slate-800'}`} 
+          className={`min-w-0 flex-1 rounded border p-2 text-sm disabled:opacity-70 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all ${isUpper ? 'uppercase font-semibold text-slate-900' : 'text-slate-800'}`} 
           placeholder="(chưa đọc được)" />
         {editable && !f.confirmed && !dirty && (
           <button disabled={busy || f.value == null} onClick={() => commit(f.value)}
@@ -164,14 +114,12 @@ export default function Review() {
   const [split, setSplit] = useState(loadSplit);
   const [dragging, setDragging] = useState(false);
   const box = useRef(null);
-  const nav = useNavigate();
   const [ask, setAsk] = useState(false);
   const [agree, setAgree] = useState(false);
   const [goBusy, setGoBusy] = useState(false);
   const [goErr, setGoErr] = useState("");
 
   const [showRedModal, setShowRedModal] = useState(false);
-  const [showYellowModal, setShowYellowModal] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(SPLIT_KEY, String(split)); } catch { /* bi chan: bo qua */ } }, [split]);
 
@@ -205,58 +153,31 @@ export default function Review() {
   const { inv, editable, checks } = info;
   const fields = info.fields || [];
   
-  const unconfirmedFields = fields.filter((f) => !f.confirmed);
-  const hasRed = unconfirmedFields.some(f => levelOf(f) === "red");
-  const hasYellow = unconfirmedFields.some(f => levelOf(f) === "yellow" || levelOf(f) === "unknown");
-  const todo = fields.filter((f) => levelOf(f) !== "green" && !f.confirmed).length;
-
-  const handleNextStep = () => {
-    if (hasRed) {
-      setShowRedModal(true);
-      return;
-    }
-    
-    if (hasYellow) {
-      setShowYellowModal(true);
-      return;
-    }
-
-    navigate(`/entries?id=${inv.invoice_id}`);
-  };
-
-  const { inv, fields, editable, checks } = info;
-  const pending = fields.filter((f) => f.confidence_level !== "green" && !f.confirmed);
+  const pending = fields.filter((f) => levelOf(f) !== "green" && !f.confirmed);
   const todo = pending.length;
+  const hasRed = pending.some((f) => levelOf(f) === "red");
   const empty = pending.filter((f) => f.value == null || String(f.value).trim() === "");
   const next = `/entries?id=${inv.invoice_id}`;
 
-  // Sang Dinh khoan: neu con truong chua du tin cay va chua xac nhan thi PHAI qua hop thoai xac nhan;
-  // bam "xac nhan" se ghi nhan cac truong do la da kiem tra (nen nut "✓ Đúng" luon co tac dung that).
-  function goNext() {
-    if (!editable || todo === 0) return nav(next);
+  // Sang Dinh khoan: con truong DO chua xac nhan -> chan (popup do);
+  // con truong vang/chua ro -> hop thoai xac nhan, bam "xac nhan" se ghi nhan cac truong do la da kiem tra.
+  function handleNextStep() {
+    if (!editable || todo === 0) return navigate(next);
+    if (hasRed) return setShowRedModal(true);
     setAgree(false); setGoErr(""); setAsk(true);
   }
   async function confirmAndGo() {
     setGoBusy(true); setGoErr("");
     try {
       for (const f of pending) await save(f, f.value);
-      nav(next);
+      navigate(next);
     } catch (e) { setGoErr(e.message); setGoBusy(false); }
   }
 
   return (
-    <section className="mx-auto max-w-[110rem]">
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <button className="text-sm text-blue-700 hover:underline" onClick={() => setParams({})}>← Danh sách</button>
-        <h1 className="text-2xl font-bold text-slate-800">Hóa đơn #{inv.invoice_id}</h1>
-        <StatusBadge status={inv.status} />
-        <span className="min-w-0 truncate text-sm text-slate-600">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
-        <button onClick={goNext}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 sm:ml-auto sm:w-auto">
-  return (
-    <section className="relative">
+    <section className="relative mx-auto max-w-[110rem]">
 
-      {/* POP-UP LỖI NGHIÊM TRỌNG (ĐỎ) - TRẢ VỀ STYLE CHUẨN */}
+      {/* POP-UP LỖI NGHIÊM TRỌNG (ĐỎ) */}
       {showRedModal && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
@@ -269,39 +190,10 @@ export default function Review() {
                 Vẫn còn trường dữ liệu có độ tin cậy <b className="text-red-600">THẤP (Đỏ)</b> chưa được xác nhận. Vui lòng tự gõ sửa lại hoặc bấm <b>'✓ Đúng'</b> trước khi đi tiếp để tránh sai sót định khoản!
               </p>
               <div className="flex justify-center">
-                <button 
-                  onClick={() => setShowRedModal(false)} 
+                <button
+                  onClick={() => setShowRedModal(false)}
                   className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors shadow-md w-full">
                   Đã hiểu & Quay lại sửa
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* POP-UP CẢNH BÁO XÁC NHẬN (VÀNG) - TRẢ VỀ STYLE CHUẨN */}
-      {showYellowModal && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-amber-50 shadow-inner">
-                <span className="text-3xl font-bold text-amber-600">!</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận chuyển trang</h3>
-              <p className="text-slate-600 mb-8 leading-relaxed text-sm">
-                Vẫn còn một số trường dữ liệu chưa được xác nhận (độ tin cậy <b className="text-amber-600">Trung bình</b>). Bạn có chắc chắn thông tin trên hóa đơn đã chính xác 100% để tiếp tục sang Định khoản?
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button 
-                  onClick={() => setShowYellowModal(false)} 
-                  className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg font-bold transition-colors w-1/2">
-                  Hủy bỏ
-                </button>
-                <button 
-                  onClick={() => { setShowYellowModal(false); navigate(`/entries?id=${inv.invoice_id}`); }} 
-                  className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2">
-                  Tiếp tục
                 </button>
               </div>
             </div>
@@ -314,11 +206,11 @@ export default function Review() {
         <div className="w-px h-4 bg-slate-300 mx-1"></div>
         <h1 className="text-xl font-bold text-slate-800">Hóa đơn #{inv.invoice_id}</h1>
         <StatusBadge status={inv.status} />
-        <span className="text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
-        
-        <button 
+        <span className="min-w-0 truncate text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
+
+        <button
           onClick={handleNextStep}
-          className={`ml-auto rounded-lg px-4 py-1.5 font-medium shadow-sm transition-colors ${hasRed ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+          className={`ml-auto w-full rounded-lg px-4 py-1.5 font-medium shadow-sm transition-colors sm:w-auto ${hasRed ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
         >
           Tiếp: Định khoản →
         </button>
@@ -333,9 +225,9 @@ export default function Review() {
           <span>❌</span> Lý do từ chối: {inv.reject_reason}
         </p>
       )}
-      <div ref={box} className="flex min-h-[32rem] flex-col gap-3 md:h-[calc(100vh-12rem)] md:flex-row md:gap-0"
+      <div ref={box} className="flex min-h-[32rem] flex-col gap-4 md:h-[calc(100vh-12rem)] md:flex-row md:gap-0"
         style={{ "--split": `${split}%` }}>
-        <div className={`h-[32rem] overflow-hidden rounded-lg border border-slate-200 bg-white shadow md:h-auto md:w-[var(--split)] ${dragging ? "pointer-events-none" : ""}`}>
+        <div className={`h-[32rem] overflow-hidden rounded-lg border shadow-sm bg-white md:h-auto md:w-[var(--split)] ${dragging ? "pointer-events-none" : ""}`}>
           <FileViewer invoiceId={inv.invoice_id} fileType={inv.file_type} filename={inv.filename} />
         </div>
         <div role="separator" aria-orientation="vertical" aria-label="Kéo để đổi tỷ lệ chia màn hình"
@@ -347,16 +239,10 @@ export default function Review() {
             if (e.key === "ArrowLeft") setSplit((s) => Math.max(SPLIT_MIN, s - 5));
             if (e.key === "ArrowRight") setSplit((s) => Math.min(SPLIT_MAX, s + 5));
           }}
-          className="hidden w-2 shrink-0 cursor-col-resize rounded bg-slate-200 hover:bg-blue-300 focus:bg-blue-400 md:mx-1 md:block" />
-        <div className="min-w-0 space-y-3 md:flex-1 md:overflow-y-auto md:pr-1">
-          <p className={`rounded p-2 text-sm ${todo ? "bg-amber-50 text-amber-800" : "bg-green-50 text-green-800"}`}>
-            {todo
-              ? `Còn ${todo} trường độ tin cậy chưa cao cần xem lại (sửa hoặc bấm “✓ Đúng”). Nếu bỏ qua, hệ thống sẽ yêu cầu xác nhận trước khi sang Định khoản.`
-              : "Tất cả trường đã đủ tin cậy hoặc đã được xác nhận."}
           className="hidden w-3 shrink-0 cursor-col-resize hover:bg-blue-200 active:bg-blue-400 md:mx-1 md:block transition-colors rounded-full" />
-        <div className="min-w-0 space-y-4 overflow-y-auto md:flex-1 pl-1 pr-2">
+        <div className="min-w-0 space-y-4 md:flex-1 md:overflow-y-auto md:pl-1 md:pr-2">
           <p className={`rounded-lg border p-3 text-sm font-medium shadow-sm ${todo ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-green-50 border-green-200 text-green-800"}`}>
-            {todo ? `🎯 Còn ${todo} trường độ tin cậy chưa cao cần xem lại (sửa hoặc bấm “✓ Đúng”).` : "✅ Tất cả trường đã đủ tin cậy hoặc đã được xác nhận."}
+            {todo ? `🎯 Còn ${todo} trường độ tin cậy chưa cao cần xem lại (sửa hoặc bấm “✓ Đúng”). Nếu bỏ qua, hệ thống sẽ yêu cầu xác nhận trước khi sang Định khoản.` : "✅ Tất cả trường đã đủ tin cậy hoặc đã được xác nhận."}
           </p>
           {fields.length === 0 && <p className="text-sm text-slate-500 italic p-4 text-center border rounded-lg bg-slate-50">Hóa đơn chưa có trường nào (chưa đọc xong hoặc đọc lỗi).</p>}
           <ul className="space-y-3">
@@ -382,7 +268,7 @@ export default function Review() {
               {pending.map((f) => (
                 <li key={f.field_id} className="flex flex-wrap items-baseline gap-x-2 rounded border border-slate-200 px-3 py-2">
                   <b className="text-slate-800">{LABEL[f.field_name] || f.field_name}</b>
-                  <span className={`rounded px-1.5 text-xs ${LEVEL[f.confidence_level].chip}`}>{LEVEL[f.confidence_level].text}</span>
+                  <span className={`rounded px-1.5 text-xs ${LEVEL[levelOf(f)].chip}`}>{LEVEL[levelOf(f)].text}</span>
                   <span className="min-w-0 flex-1 break-words text-right text-slate-700">{f.value || "(trống)"}</span>
                 </li>
               ))}
