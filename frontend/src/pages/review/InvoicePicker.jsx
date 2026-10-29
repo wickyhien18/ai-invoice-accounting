@@ -4,8 +4,61 @@ import { api } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { dateVN, money } from "../invoices/format.js";
 
-// Chon hoa don de lam viec (dung chung cho man hinh Kiem tra va Dinh khoan). Chon xong dat ?id=... tren URL.
-// Cac the loc: "Tat ca" dung dau, roi 3 trang thai chinh (hoa don bi tu choi chi hien o "Tat ca").
+// ---------------------------------------------------------
+// COMPONENT PHÂN TRANG DÙNG CHUNG
+// ---------------------------------------------------------
+const Pagination = ({ totalItems, pageSize, currentPage, setPageSize, setCurrentPage }) => {
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+
+  return (
+    <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className="flex items-center gap-3 text-sm text-slate-600 font-medium">
+        <span>Hiển thị</span>
+        <select 
+          value={pageSize} 
+          onChange={(e) => { 
+            setPageSize(Number(e.target.value)); 
+            setCurrentPage(1); 
+          }}
+          className="border border-slate-300 rounded px-2 py-1 bg-white focus:outline-none focus:border-blue-500 shadow-sm"
+        >
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </select>
+        <span>dòng / trang</span>
+      </div>
+      
+      <div className="flex items-center gap-4 text-sm font-medium">
+        <span className="text-slate-500">
+          Hiển thị {Math.min((currentPage - 1) * pageSize + 1, totalItems)} - {Math.min(currentPage * pageSize, totalItems)} trong tổng số {totalItems} dòng
+        </span>
+        
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentPage === 1} 
+            onClick={() => setCurrentPage(p => p - 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Trước
+          </button>
+          <div className="px-4 py-1.5 bg-slate-200 text-slate-800 rounded font-bold">
+            Trang {currentPage} / {totalPages}
+          </div>
+          <button 
+            disabled={currentPage === totalPages || totalPages === 0} 
+            onClick={() => setCurrentPage(p => p + 1)}
+            className="px-3 py-1.5 border border-slate-300 rounded bg-white text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:bg-slate-50 shadow-sm transition-colors"
+          >
+            Sau
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Chon hoa don de lam viec (dung chung cho man hinh Kiem tra va Dinh khoan).
 const TABS = [
   ["all", "Tất cả", null],
   ["cho_xac_nhan", "Chờ xác nhận", "cho_xac_nhan"],
@@ -17,29 +70,89 @@ export default function InvoicePicker({ title, hint }) {
   const [, setParams] = useSearchParams();
   const [rows, setRows] = useState(null);
   const [tab, setTab] = useState("all");
+  const [searchQuery, setSearchQuery] = useState(""); // State lưu nội dung tìm kiếm
   const [err, setErr] = useState("");
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     api("/api/invoices?limit=200").then((r) => setRows(r.data)).catch((e) => setErr(e.message));
   }, []);
 
+  // Reset về trang 1 khi đổi tab hoặc gõ tìm kiếm
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tab, searchQuery]);
+
   const open = (id) => setParams({ id: String(id) });
+  
+  // Hàm loại bỏ dấu tiếng Việt để tìm kiếm không phân biệt dấu
+  const removeAccents = (str) => {
+    return str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+  };
+
+  // Bước 1: Lọc theo trạng thái tab (trước khi tính số lượng hiển thị trên tab)
   const count = (st) => (rows || []).filter((r) => !st || r.status === st).length;
   const cur = TABS.find((t) => t[0] === tab);
-  const shown = (rows || []).filter((r) => !cur[2] || r.status === cur[2]);
+  
+  // Bước 2: Lọc danh sách hiển thị theo cả Tab và Nội dung tìm kiếm
+  const shown = (rows || []).filter((r) => {
+    // Kiểm tra trạng thái tab
+    const matchStatus = !cur[2] || r.status === cur[2];
+    
+    // Kiểm tra nội dung tìm kiếm
+    if (!searchQuery.trim()) return matchStatus;
+    
+    const query = removeAccents(searchQuery);
+    const seller = removeAccents(r.seller_name);
+    const invNum = r.invoice_number ? String(r.invoice_number).toLowerCase() : "";
+    const invId = String(r.invoice_id);
+    
+    const matchSearch = seller.includes(query) || invNum.includes(query) || invId.includes(query);
+    
+    return matchStatus && matchSearch;
+  });
+
+  const currentRows = shown.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   return (
     <section className="mx-auto max-w-6xl">
       <h2 className="mb-2 text-2xl font-bold text-slate-800">{title}</h2>
       <p className="mb-4 text-sm text-slate-600">{hint}</p>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3 text-sm" role="tablist">
-        {TABS.map(([k, label, st]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-            className={`rounded-full px-5 py-2 ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
-            {label}{rows ? ` (${count(st)})` : ""}
-          </button>
-        ))}
+      <div className="mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Thanh Tabs */}
+        <div className="flex flex-wrap items-center gap-3 text-sm" role="tablist">
+          {TABS.map(([k, label, st]) => (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+              className={`rounded-full px-5 py-2 transition-colors ${tab === k ? "bg-blue-600 font-semibold text-white shadow-sm" : "bg-white text-slate-700 ring-1 ring-slate-300 hover:bg-slate-100"}`}>
+              {label}{rows ? ` (${count(st)})` : ""}
+            </button>
+          ))}
+        </div>
+        
+        {/* Ô Tìm Kiếm Mới Thêm */}
+        <div className="relative w-full md:w-72 shrink-0">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <span className="text-slate-400">🔍</span>
+          </div>
+          <input 
+            type="text" 
+            placeholder="Tìm theo ID, Số HĐ, Người bán..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-full text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm"
+          />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery("")}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 font-bold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
@@ -72,6 +185,50 @@ export default function InvoicePicker({ title, hint }) {
             {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
           </tbody>
         </table>
+      
+      <div className="flex flex-col rounded-lg border border-slate-200 bg-white shadow">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+            <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+              <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
+                <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {currentRows.map((r) => (
+                <tr key={r.invoice_id} className="cursor-pointer transition-colors hover:bg-blue-50" onClick={() => open(r.invoice_id)}>
+                  <td className="px-6 py-4 text-slate-500">{r.invoice_id}</td>
+                  <td className="px-6 py-4 font-medium">{r.invoice_number || "—"}</td>
+                  <td className="px-6 py-4">{dateVN(r.invoice_date)}</td>
+                  <td className="max-w-[24rem] truncate px-6 py-4 font-medium uppercase tracking-wide text-slate-700" title={r.seller_name}>{r.seller_name || "—"}</td>
+                  <td className="px-6 py-4 text-right font-medium tabular-nums text-slate-800">{money(r.total_amount)}</td>
+                  <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={(e) => { e.stopPropagation(); open(r.invoice_id); }}
+                      className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700 transition-colors">Mở</button>
+                  </td>
+                </tr>
+              ))}
+              {rows && shown.length === 0 && (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                  {searchQuery 
+                    ? `Không tìm thấy kết quả nào phù hợp với "${searchQuery}".` 
+                    : (tab === "all" ? "Chưa có hóa đơn nào." : `Không có hóa đơn nào ở mục “${cur[1]}”.`)}
+                </td></tr>
+              )}
+              {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        
+        {shown.length > 0 && (
+          <Pagination 
+            totalItems={shown.length}
+            pageSize={pageSize}
+            currentPage={currentPage}
+            setPageSize={setPageSize}
+            setCurrentPage={setCurrentPage}
+          />
+        )}
       </div>
     </section>
   );

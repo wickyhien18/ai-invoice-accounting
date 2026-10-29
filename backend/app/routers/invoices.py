@@ -6,18 +6,19 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, Body
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from app.config import settings
-from app.database import SessionLocal, get_db
+from app.database import get_db
 from app.models import Invoice, User
 from app.security import get_current_user
 from app.services import ai_client
 from app.services.checks import run_checks
-from app.services.invoice_data import display_name, process_invoice
+from app.services.invoice_data import display_name, is_running, process_invoice, run_in_background
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
 
 router = APIRouter(prefix="/api/invoices", tags=["A"])
@@ -62,11 +63,6 @@ def _get_or_404(db: Session, invoice_id: int) -> Invoice:
     return inv
 
 
-def _process_in_background(invoice_id: int) -> None:
-    with SessionLocal() as db:
-        process_invoice(db, invoice_id)
-
-
 @router.post("", status_code=201)
 def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
                    db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -97,7 +93,7 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
         process_invoice(db, inv.invoice_id)  # nhanh, khong can AI nen xu ly ngay
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
+        background.add_task(run_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}
 
 
@@ -108,7 +104,10 @@ def invoice_progress(invoice_id: int, db: Session = Depends(get_db), _: User = D
     if inv.status != "dang_xu_ly":
         return {"data": {"status": inv.status, "percent": 100,
                          "stage": "Không đọc được hóa đơn" if inv.status == "loi_xu_ly" else "Hoàn tất"}}
-    p = ai_client.get_progress(inv.file_path) or {"percent": 5, "stage": "Đang chờ xử lý"}
+    if is_running(inv.invoice_id):  # chi hoi ai-service khi da toi luot -> khong con 404 spam
+        p = ai_client.get_progress(inv.file_path) or {"percent": 8, "stage": "Đang chuẩn bị đọc hóa đơn"}
+    else:
+        p = {"percent": 5, "stage": "Đang xếp hàng chờ tới lượt"}
     return {"data": {"status": inv.status, **p}}
 
 
@@ -134,8 +133,8 @@ def list_invoices(status: str | None = None, file_type: str | None = None, q: st
                 raise HTTPException(422, f"Ngày không hợp lệ: {raw}")
             cond.append(Invoice.invoice_date >= d if op == "ge" else Invoice.invoice_date <= d)
     total = db.scalar(select(func.count()).select_from(Invoice).where(*cond))
-    rows = db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
-                      .limit(limit).offset(offset))
+    rows = list(db.scalars(select(Invoice).where(*cond).order_by(Invoice.invoice_id.desc())
+                           .limit(limit).offset(offset)))
     return {"data": [invoice_out(r) for r in rows], "total": total}
 
 
@@ -191,5 +190,44 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
         process_invoice(db, inv.invoice_id)
         db.refresh(inv)
     else:
-        background.add_task(_process_in_background, inv.invoice_id)
+        background.add_task(run_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}
+
+@router.delete("/{invoice_id}")
+async def delete_invoice(
+    invoice_id: int, 
+    payload: dict = Body(default={}), 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    password = payload.get("password")
+    
+    # 1. BẢO MẬT: Kiểm tra mật khẩu có được nhập hay không
+    if not password:
+        raise HTTPException(status_code=400, detail="Vui lòng nhập mật khẩu xác nhận!")
+    
+    # 2. XÁC THỰC: Kiểm tra mật khẩu nhập vào có khớp với mật khẩu của user đang đăng nhập không
+    from app.security import verify_password
+    if not current_user or not verify_password(password, current_user.password_hash):
+        raise HTTPException(status_code=401, detail="Mật khẩu xác nhận không chính xác!")
+
+    # 3. Tìm hóa đơn theo ID hoặc invoice_id
+    invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
+    if not invoice:
+        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+        
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
+    
+    try:
+        # 4. Xóa các dữ liệu phụ thuộc ở các bảng liên quan để tránh lỗi khóa ngoại
+        db.execute(text("DELETE FROM invoice_fields WHERE invoice_id = :val"), {"val": invoice_id})
+        db.execute(text("DELETE FROM journal_entries WHERE invoice_id = :val"), {"val": invoice_id})
+
+        # 5. Xóa hóa đơn chính
+        db.delete(invoice)
+        db.commit()
+        return {"message": "Xóa hóa đơn thành công", "invoice_id": invoice_id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Lỗi database: {str(e)}")

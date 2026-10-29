@@ -2,13 +2,17 @@
 
 Goi B (sua truong) nen goi sync_invoice_from_fields() sau khi ghi final_value de bang invoices luon khop.
 """
+import collections
+import contextlib
 import logging
+import threading
 from decimal import Decimal
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import SessionLocal
 from app.models import Invoice, InvoiceField
 from app.services import ai_client
 from app.services.normalize import FIELD_NAMES, canonical, to_column
@@ -68,10 +72,84 @@ def process_invoice(db: Session, invoice_id: int) -> str:
         result = extract_fields(inv)
         save_extraction(db, inv, result["fields"])
         inv.status = "cho_xac_nhan"
-    except (XmlInvoiceError, ai_client.AIServiceError, OSError, KeyError) as e:
-        log.error("Xu ly hoa don %s loi: %s", invoice_id, e)
+    except Exception as e:  # MOI loi deu phai ra loi_xu_ly; neu de lot thi hoa don ket 'dang_xu_ly' mai mai
+        known = isinstance(e, (XmlInvoiceError, ai_client.AIServiceError, OSError, KeyError))
+        log.error("Xu ly hoa don %s loi: %s", invoice_id, e, exc_info=not known)
         db.rollback()
         inv = db.get(Invoice, invoice_id)
         inv.status = "loi_xu_ly"
     db.commit()
     return inv.status
+
+
+# ---- Xu ly nen: toi da SCAN_CONCURRENCY hoa don cung luc, xep hang theo THU TU TAI LEN (FIFO) ----
+# ai-service tu tuan tu hoa buoc doc anh (PaddleOCR khong an toan da luong) nen 2 luong cho phep
+# buoc OCR cua hoa don sau chay chong len buoc goi Gemini cua hoa don truoc.
+SCAN_CONCURRENCY = 2
+_RUNNING: set[int] = set()
+
+
+class _FifoGate:
+    def __init__(self, n: int):
+        self._n = n
+        self._active = 0
+        self._queue: collections.deque = collections.deque()
+        self._cond = threading.Condition()
+
+    @contextlib.contextmanager
+    def slot(self):
+        ticket = object()
+        with self._cond:
+            self._queue.append(ticket)
+            while self._queue[0] is not ticket or self._active >= self._n:
+                self._cond.wait()
+            self._queue.popleft()
+            self._active += 1
+            self._cond.notify_all()
+        try:
+            yield
+        finally:
+            with self._cond:
+                self._active -= 1
+                self._cond.notify_all()
+
+
+_GATE = _FifoGate(SCAN_CONCURRENCY)
+
+
+def is_running(invoice_id: int) -> bool:
+    """True neu hoa don da toi luot xu ly (khac voi dang xep hang)."""
+    return invoice_id in _RUNNING
+
+
+def run_in_background(invoice_id: int) -> None:
+    """Chay process_invoice trong luong nen, hang doi FIFO, toi da SCAN_CONCURRENCY hoa don moi lan."""
+    with _GATE.slot():
+        _RUNNING.add(invoice_id)
+        try:
+            with SessionLocal() as db:
+                process_invoice(db, invoice_id)
+        finally:
+            _RUNNING.discard(invoice_id)
+
+
+def recover_stuck() -> int:
+    """Luc khoi dong lai backend, nhung hoa don con 'dang_xu_ly' (tac vu nen bi mat do tat/reload) duoc xu ly lai
+    lan luot. Tra ve so hoa don duoc nhat lai."""
+    with SessionLocal() as db:
+        ids = list(db.scalars(select(Invoice.invoice_id).where(Invoice.status == "dang_xu_ly")
+                              .order_by(Invoice.invoice_id)))
+    for i in ids:
+        run_in_background(i)
+    return len(ids)
+
+
+def recover_stuck_in_thread() -> None:
+    def work():
+        try:
+            n = recover_stuck()
+            if n:
+                log.info("Da xu ly lai %s hoa don bi do dang luc khoi dong", n)
+        except Exception:
+            log.exception("Khong nhat lai duoc hoa don dang do")
+    threading.Thread(target=work, daemon=True, name="recover-invoices").start()
