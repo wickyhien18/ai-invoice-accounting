@@ -44,7 +44,7 @@ export default function InvoicePicker({ title, hint }) {
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table className="min-w-[40rem] divide-y divide-slate-200 text-left text-sm">
           <thead className="bg-slate-100 text-xs uppercase text-slate-600">
             <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
               <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
