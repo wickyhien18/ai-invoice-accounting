@@ -46,7 +46,7 @@ function AccountSelect({ value, onChange, accounts, label, disabled }) {
   const known = accounts.some((a) => a.account_code === value);
   return (
     <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded border p-2 text-sm disabled:opacity-70">
+      className="w-full rounded border border-slate-300 bg-white p-2 text-sm disabled:opacity-70">
       <option value="">— chọn —</option>
       {!known && value && <option value={value}>{value} (không còn trong danh mục)</option>}
       {accounts.map((a) => <option key={a.account_code} value={a.account_code}>{a.account_code} – {a.account_name}</option>)}
@@ -215,7 +215,7 @@ export default function Entries() {
       )}
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow">
-        <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+        <table className="min-w-[56rem] divide-y divide-slate-200 text-left text-sm">
           <thead className="bg-slate-100">
             <tr>{["Tài khoản Nợ", "Tài khoản Có", "Số tiền (VND)", "Nguồn gợi ý", ""].map((h) => (
               <th key={h} className="px-6 py-3 text-xs font-semibold uppercase text-slate-600">{h}</th>))}</tr>
@@ -232,10 +232,10 @@ export default function Entries() {
                   <td className="px-6 py-4">
                     <input aria-label={`Dòng ${i + 1}: số tiền`} inputMode="decimal" value={r.amount} disabled={!editable}
                       onChange={(e) => patch(r.key, { amount: e.target.value.replace(/[^\d.]/g, "") })}
-                      className="w-40 rounded border p-2 text-right tabular-nums disabled:opacity-70" />
+                      className="w-40 rounded border border-slate-300 bg-white p-2 text-right tabular-nums disabled:opacity-70" />
                     {errors[i] && editable && <p role="alert" className="mt-1 max-w-[10rem] text-xs text-red-600">{errors[i]}</p>}
                   </td>
-                  <td className="max-w-[22rem] px-6 py-4">
+                  <td className="min-w-[14rem] max-w-[22rem] px-6 py-4">
                     <span className={`rounded px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
                     {r.probability != null && <span className="ml-1 text-xs text-slate-500">chắc {Math.round(r.probability * 100)}%</span>}
                     {r.edited && r.source !== "saved" && r.source !== "manual" && <span className="ml-1 text-xs text-blue-700">đã sửa</span>}

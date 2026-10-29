@@ -156,6 +156,35 @@ export default function InvoicePicker({ title, hint }) {
       </div>
 
       {err && <p className="mb-3 text-sm text-red-600">{err}</p>}
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow">
+        <table className="min-w-[40rem] divide-y divide-slate-200 text-left text-sm">
+          <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+            <tr>{["#", "Số HĐ", "Ngày", "Người bán", "Tổng tiền", "Trạng thái", ""].map((h) => (
+              <th key={h} className="px-6 py-3 font-semibold">{h}</th>))}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {shown.map((r) => (
+              <tr key={r.invoice_id} className="cursor-pointer border-t transition-colors hover:bg-blue-50" onClick={() => open(r.invoice_id)}>
+                <td className="px-6 py-4 text-slate-500">{r.invoice_id}</td>
+                <td className="px-6 py-4 font-medium">{r.invoice_number || "—"}</td>
+                <td className="px-6 py-4">{dateVN(r.invoice_date)}</td>
+                <td className="max-w-[24rem] truncate px-6 py-4 font-medium" title={r.seller_name}>{r.seller_name || "—"}</td>
+                <td className="px-6 py-4 text-right font-medium tabular-nums">{money(r.total_amount)}</td>
+                <td className="px-6 py-4"><StatusBadge status={r.status} /></td>
+                <td className="px-6 py-4 text-right">
+                  <button onClick={(e) => { e.stopPropagation(); open(r.invoice_id); }}
+                    className="rounded bg-blue-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-blue-700">Mở</button>
+                </td>
+              </tr>
+            ))}
+            {rows && shown.length === 0 && (
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">
+                {tab === "all" ? "Chưa có hóa đơn nào." : `Không có hóa đơn nào ở mục “${cur[1]}”.`}
+              </td></tr>
+            )}
+            {!rows && !err && <tr><td colSpan={7} className="px-6 py-12 text-center text-sm text-slate-500">Đang tải…</td></tr>}
+          </tbody>
+        </table>
       
       <div className="flex flex-col rounded-lg border border-slate-200 bg-white shadow">
         <div className="overflow-x-auto">

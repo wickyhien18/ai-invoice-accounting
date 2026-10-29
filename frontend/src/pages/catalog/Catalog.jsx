@@ -118,7 +118,7 @@ function Accounts({ canEdit }) {
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow flex flex-col">
         <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
           <thead className="bg-slate-100 text-xs uppercase text-slate-600">
-            <tr><th className="w-32 px-6 py-3 font-semibold">Mã</th><th className="px-6 py-3 font-semibold">Tên tài khoản</th>{canEdit && <th className="w-40 px-3 py-2" />}</tr>
+            <tr><th className="w-32 px-6 py-3 font-semibold">Mã</th><th className="px-6 py-3 font-semibold">Tên tài khoản</th>{canEdit && <th className="w-40 px-6 py-3" />}</tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
             {currentRows.map((a) => ( // SỬA: Map theo currentRows thay vì rows
@@ -142,7 +142,7 @@ function Accounts({ canEdit }) {
                 )}
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={3} className="px-3 py-6 text-center text-slate-500">Không có tài khoản nào.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={3} className="px-6 py-6 text-center text-slate-500">Không có tài khoản nào.</td></tr>}
           </tbody>
         </table>
         
