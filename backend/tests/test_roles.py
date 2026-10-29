@@ -89,3 +89,20 @@ def test_delete_blocked_when_processing_or_exported(client):
         inv.status, inv.export_status = "da_duyet", "da_xuat"
         db.commit()
     assert delete(client, iid).status_code == 409
+
+
+def test_catalog_read_for_all_edit_only_ktt(client):
+    """Danh muc tai khoan / loai khoan (goi y dinh khoan): ai cung xem, chi ke toan truong them/sua/xoa."""
+    ktv, ktt = login(client, KTV), login(client, KTT)
+    assert client.get("/api/accounts", headers=ktv).status_code == 200
+    assert client.get("/api/categories", headers=ktv).status_code == 200
+    assert client.post("/api/accounts", json={"account_code": "9999", "account_name": "Thu"}, headers=ktv).status_code == 403
+    assert client.post("/api/categories", json={"category_name": "Thu"}, headers=ktv).status_code == 403
+    assert client.post("/api/accounts", json={"account_code": "9999", "account_name": "Thu"}, headers=ktt).status_code == 201
+    r = client.post("/api/categories", json={"category_name": "Thu", "default_debit_account": "9999"}, headers=ktt)
+    assert r.status_code == 201
+    cid = r.json()["data"]["category_id"]
+    assert client.post(f"/api/categories/{cid}/aliases", json={"alias_text": "Thử nghiệm"}, headers=ktv).status_code == 403
+    assert client.post(f"/api/categories/{cid}/aliases", json={"alias_text": "Thử nghiệm"}, headers=ktt).status_code == 201
+    assert client.delete(f"/api/categories/{cid}", headers=ktv).status_code == 403
+    assert client.delete(f"/api/categories/{cid}", headers=ktt).status_code == 200

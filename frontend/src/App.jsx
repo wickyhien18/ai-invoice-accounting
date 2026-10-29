@@ -5,6 +5,7 @@ import ThemeToggle from "./components/ThemeToggle.jsx";
 import Login from "./pages/Login.jsx";
 import { UserContext } from "./userContext.js";
 import { Approvals, Entries, Export, PurchaseOrders, Review, Upload } from "./pages/pages.jsx";
+import Catalog from "./pages/catalog/Catalog.jsx";
 
 // Chu so huu khung giao dien (nav, bao ve route theo vai tro): Duong (C9)
 // [duong dan, ten menu, vai tro duoc vao]. KTV = ke toan vien (nhap lieu), KTT = ke toan truong (duyet, xoa).
@@ -12,7 +13,8 @@ const NAV = [
   ["/", "Tải hóa đơn", ["KTV"]],
   ["/", "Danh sách hóa đơn", ["KTT"]],
   ["/review", "Kiểm tra", ["KTV"]],
-  ["/entries", "Bút toán", ["KTV"]],
+  // KTV gan dinh khoan (/entries) di tu trang Kiem tra nen khong co tren menu; "But toan" cua KTT = danh muc goi y dinh khoan
+  ["/catalog", "Bút toán", ["KTT"]],
   ["/approvals", "Hàng chờ duyệt", ["KTT"]],
   ["/po", "PO", ["KTV"]],
   ["/export", "Xuất", ["KTV", "KTT"]],
@@ -61,6 +63,7 @@ export default function App() {
             <Route path="/" element={<Upload />} />
             <Route path="/review" element={only(["KTV"], <Review />)} />
             <Route path="/entries" element={only(["KTV"], <Entries />)} />
+            <Route path="/catalog" element={only(["KTT"], <Catalog />)} />
             <Route path="/approvals" element={only(["KTT"], <Approvals />)} />
             <Route path="/po" element={only(["KTV"], <PurchaseOrders />)} />
             <Route path="/export" element={only(["KTV", "KTT"], <Export />)} />

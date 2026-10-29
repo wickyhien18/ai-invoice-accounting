@@ -170,7 +170,10 @@ def detect_anomalies_in_invoices(invoices):
         amt = float(inv.total_amount or inv.total or 0)
         
         # CHỈ BẮT LỖI NẾU: Mô hình đánh dấu bất thường (-1) VÀ số tiền phải CAO HƠN hẳn mặt bằng chung (VD: > 500 triệu)
-        if preds[i] == -1 and amt > max(500000000, avg_amount * 5):
+        by_ml = preds[i] == -1 and amt > max(500000000, avg_amount * 5)
+        others = amounts[:i] + amounts[i + 1:]
+        by_median = amt > max(500000000, float(np.median(others)) * 10)
+        if by_ml or by_median:
             inv.is_anomaly = True
             inv.anomaly_reason = f"Cảnh báo: Số tiền {amt:,.0f} VNĐ cao bất thường so với thông lệ!"
         else:
