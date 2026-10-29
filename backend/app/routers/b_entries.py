@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Account, Invoice, JournalEntry, User
 from app.routers.b_fields import EDITABLE_STATUSES
-from app.security import get_current_user
+from app.security import get_current_user, require_role
 from app.services import gl_suggest
 
 router = APIRouter(prefix="/api/invoices", tags=["B"])
@@ -33,15 +33,16 @@ def entry_out(e: JournalEntry) -> dict:
 
 
 @router.get("/{invoice_id}/journal-entries")
-def get_entries(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def get_entries(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     inv = _invoice(db, invoice_id)
     rows = db.scalars(select(JournalEntry).where(JournalEntry.invoice_id == invoice_id)
                       .order_by(JournalEntry.journal_entry_id))
-    return {"data": [entry_out(e) for e in rows], "editable": inv.status in EDITABLE_STATUSES}
+    # chi ke toan vien sua but toan; ke toan truong chi xem
+    return {"data": [entry_out(e) for e in rows], "editable": inv.status in EDITABLE_STATUSES and user.role_name == "KTV"}
 
 
 @router.post("/{invoice_id}/suggest-entries")
-def suggest_entries(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def suggest_entries(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(require_role("KTV"))):
     inv = _invoice(db, invoice_id)
     if inv.status in ("dang_xu_ly", "loi_xu_ly"):
         raise HTTPException(409, "Hóa đơn chưa đọc xong nên chưa gợi ý được định khoản")
@@ -81,7 +82,7 @@ class EntriesIn(BaseModel):
 
 
 @router.put("/{invoice_id}/journal-entries")
-def put_entries(invoice_id: int, body: EntriesIn, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def put_entries(invoice_id: int, body: EntriesIn, db: Session = Depends(get_db), _: User = Depends(require_role("KTV"))):
     """Thay toan bo but toan cua hoa don bang danh sach gui len (khong cong don)."""
     inv = _invoice(db, invoice_id)
     if inv.status not in EDITABLE_STATUSES:

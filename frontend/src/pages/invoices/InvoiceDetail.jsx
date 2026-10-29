@@ -3,6 +3,7 @@ import { api, fetchBlobUrl } from "../../api/client.js";
 import StatusBadge from "./StatusBadge.jsx";
 import { creep } from "./smoothProgress.js";
 import { dateVN, FILE_TYPE, money } from "./format.js";
+import { isKTV, useUser } from "../../userContext.js";
 
 const ROWS = [
   ["invoice_series", "Ký hiệu"], ["invoice_number", "Số hóa đơn"], ["invoice_date", "Ngày lập", dateVN],
@@ -17,6 +18,7 @@ const SUCCESS_SHOW_MS = 8000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
+  const canWork = isKTV(useUser());   // chi ke toan vien duoc "Xu ly lai"
   const [inv, setInv] = useState(null);
   const [check, setCheck] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -124,7 +126,7 @@ export default function InvoiceDetail({ invoiceId, onClose, onChanged }) {
             </dl>
             <div className="mb-4 flex flex-wrap gap-2">
               <button disabled={busy} onClick={openFile} className="rounded bg-blue-600 px-3 py-1 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Xem file gốc</button>
-              {["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
+              {canWork && ["loi_xu_ly", "cho_xac_nhan"].includes(inv.status) && (
                 <button disabled={busy} onClick={reprocess} className="rounded bg-amber-600 px-3 py-1 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">Xử lý lại</button>
               )}
             </div>

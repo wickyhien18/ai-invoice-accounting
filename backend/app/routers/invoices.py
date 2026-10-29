@@ -6,16 +6,16 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, Body
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
-from sqlalchemy import func, or_, select
+from pydantic import BaseModel
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.config import settings
 from app.database import get_db
-from app.models import Invoice, User
-from app.security import get_current_user
+from app.models import Invoice, InvoiceField, JournalEntry, MatchingResult, User
+from app.security import get_current_user, require_role, verify_password
 from app.services import ai_client
 from app.services.checks import run_checks
 from app.services.invoice_data import display_name, is_running, process_invoice, run_in_background
@@ -65,7 +65,7 @@ def _get_or_404(db: Session, invoice_id: int) -> Invoice:
 
 @router.post("", status_code=201)
 def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
-                   db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+                   db: Session = Depends(get_db), user: User = Depends(require_role("KTV"))):
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED:
         raise HTTPException(415, "Chỉ nhận PDF, PNG, JPG hoặc XML")
@@ -179,7 +179,7 @@ def check_invoice(invoice_id: int, db: Session = Depends(get_db), _: User = Depe
 
 @router.post("/{invoice_id}/reprocess")
 def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depends(get_db),
-              _: User = Depends(get_current_user)):
+              _: User = Depends(require_role("KTV"))):
     """Chay lai trich xuat khi loi_xu_ly (VD ai-service tat hoac het han muc Gemini)."""
     inv = _get_or_404(db, invoice_id)
     if inv.status not in REPROCESSABLE:
@@ -193,41 +193,32 @@ def reprocess(invoice_id: int, background: BackgroundTasks, db: Session = Depend
         background.add_task(run_in_background, inv.invoice_id)
     return {"data": invoice_out(inv)}
 
+
+class DeleteIn(BaseModel):
+    password: str = ""
+
+
 @router.delete("/{invoice_id}")
-async def delete_invoice(
-    invoice_id: int, 
-    payload: dict = Body(default={}), 
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    password = payload.get("password")
-    
-    # 1. BẢO MẬT: Kiểm tra mật khẩu có được nhập hay không
-    if not password:
-        raise HTTPException(status_code=400, detail="Vui lòng nhập mật khẩu xác nhận!")
-    
-    # 2. XÁC THỰC: Kiểm tra mật khẩu nhập vào có khớp với mật khẩu của user đang đăng nhập không
-    from app.security import verify_password
-    if not current_user or not verify_password(password, current_user.password_hash):
-        raise HTTPException(status_code=401, detail="Mật khẩu xác nhận không chính xác!")
-
-    # 3. Tìm hóa đơn theo ID hoặc invoice_id
-    invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
-    if not invoice:
-        invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-        
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
-    
-    try:
-        # 4. Xóa các dữ liệu phụ thuộc ở các bảng liên quan để tránh lỗi khóa ngoại
-        db.execute(text("DELETE FROM invoice_fields WHERE invoice_id = :val"), {"val": invoice_id})
-        db.execute(text("DELETE FROM journal_entries WHERE invoice_id = :val"), {"val": invoice_id})
-
-        # 5. Xóa hóa đơn chính
-        db.delete(invoice)
-        db.commit()
-        return {"message": "Xóa hóa đơn thành công", "invoice_id": invoice_id}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Lỗi database: {str(e)}")
+def delete_invoice(invoice_id: int, body: DeleteIn, db: Session = Depends(get_db),
+                   user: User = Depends(require_role("KTT"))):
+    """Chi ke toan truong, phai nhap lai mat khau cua chinh minh. Xoa vinh vien hoa don, cac truong, but toan,
+    ket qua doi chieu PO va file goc. Khong xoa hoa don dang doc hoac da xuat bang ke (se lam sai bao cao)."""
+    inv = _get_or_404(db, invoice_id)
+    if not body.password:
+        raise HTTPException(400, "Vui lòng nhập mật khẩu xác nhận!")
+    if not verify_password(body.password, user.password_hash):
+        raise HTTPException(403, "Mật khẩu xác nhận không chính xác!")
+    if inv.status == "dang_xu_ly":
+        raise HTTPException(409, "Hóa đơn đang được đọc, hãy chờ xử lý xong rồi xóa")
+    if inv.export_status == "da_xuat":
+        raise HTTPException(409, "Hóa đơn đã xuất bảng kê, không thể xóa")
+    stored = inv.file_path
+    for model in (JournalEntry, MatchingResult, InvoiceField):
+        db.execute(delete(model).where(model.invoice_id == invoice_id))
+    db.delete(inv)
+    db.commit()
+    base = settings.upload_dir.resolve()
+    path = (base / stored).resolve()
+    if base in path.parents:   # chi xoa file nam trong thu muc upload
+        path.unlink(missing_ok=True)
+    return {"data": {"deleted": invoice_id}}

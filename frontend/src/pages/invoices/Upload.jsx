@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, uploadWithProgress } from "../../api/client.js";
 import InvoiceList from "./InvoiceList.jsx";
 import { creep } from "./smoothProgress.js";
+import { isKTV, useUser } from "../../userContext.js";
 
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,.xml";
 const MAX_MB = 10;
@@ -15,6 +16,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Trang tai hoa don: keo tha nhieu file (PDF, anh, XML), tai tuan tu, roi hien danh sach va trang thai.
 export default function Upload() {
+  const canUpload = isKTV(useUser());   // KTT chi xem danh sach va xoa, khong tai hoa don
   const [queue, setQueue] = useState([]);   // [{id, name, state: cho|dang_tai|xong|loi, msg}]
   const [refreshKey, setRefreshKey] = useState(0);
   const [over, setOver] = useState(false);
@@ -107,8 +109,8 @@ export default function Upload() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Tải hóa đơn</h1>
-      <div
+      <h1 className="text-xl font-semibold">{canUpload ? "Tải hóa đơn" : "Danh sách hóa đơn"}</h1>
+      {canUpload && <div
         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); pick(e.dataTransfer.files); }}
@@ -121,9 +123,9 @@ export default function Upload() {
         <p className="mt-1 text-sm text-slate-500">PDF, ảnh (PNG, JPG) hoặc XML hóa đơn điện tử · tối đa {MAX_MB} MB mỗi file · tối đa {MAX_FILES} file mỗi lần</p>
         <input ref={input} type="file" multiple accept={ACCEPT} className="hidden"
           onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
-      </div>
+      </div>}
 
-      {queue.length > 0 && (
+      {canUpload && queue.length > 0 && (
         <ul className="space-y-1 text-sm">
           {[...queue.filter((x) => x.state === "loi"), ...queue.filter((x) => x.state !== "loi")].slice(0, 12).map((x) => {   // file loi/bi tu choi len dau de khong bi che
             const working = x.state === "dang_tai" || x.state === "dang_doc";

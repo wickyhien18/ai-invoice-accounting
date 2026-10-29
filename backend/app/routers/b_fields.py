@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Invoice, InvoiceField, User
 from app.routers.invoices import invoice_out
-from app.security import get_current_user
+from app.security import get_current_user, require_role
 from app.services.checks import run_checks
 from app.services.invoice_data import sync_invoice_from_fields
 from app.services.normalize import FIELD_NAMES, canonical
@@ -60,10 +60,12 @@ def _fields(db: Session, invoice_id: int) -> list[InvoiceField]:
 
 
 @router.get("/{invoice_id}/fields")
-def get_fields(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
+def get_fields(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     inv = _invoice(db, invoice_id)
     return {"data": [field_out(f) for f in _fields(db, invoice_id)],
-            "status": inv.status, "file_type": inv.file_type, "editable": inv.status in EDITABLE_STATUSES}
+            "status": inv.status, "file_type": inv.file_type,
+            # chi ke toan vien sua truong; ke toan truong chi xem
+            "editable": inv.status in EDITABLE_STATUSES and user.role_name == "KTV"}
 
 
 class FieldPatch(BaseModel):
@@ -72,7 +74,7 @@ class FieldPatch(BaseModel):
 
 @router.patch("/{invoice_id}/fields/{field_id}")
 def patch_field(invoice_id: int, field_id: int, body: FieldPatch, db: Session = Depends(get_db),
-                _: User = Depends(get_current_user)):
+                _: User = Depends(require_role("KTV"))):
     inv = _invoice(db, invoice_id)
     field = db.get(InvoiceField, field_id)
     if field is None or field.invoice_id != invoice_id:

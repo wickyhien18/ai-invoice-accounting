@@ -31,19 +31,19 @@ def mock(data, **extra):
 
 
 # ---- Goi B (Khanh) ----
-@router.post("/invoices/{invoice_id}/suggest-entries", tags=["B"])
+@router.post("/invoices/{invoice_id}/suggest-entries", tags=["B"], dependencies=[Depends(require_role("KTV"))])
 def suggest_entries(invoice_id: int):
     return mock([{"debit_account": "642", "credit_account": "331", "amount": "1000000.00",
                   "source": "ml", "probability": 0.82}])
 
 
-@router.put("/invoices/{invoice_id}/journal-entries", tags=["B"])
+@router.put("/invoices/{invoice_id}/journal-entries", tags=["B"], dependencies=[Depends(require_role("KTV"))])
 def put_entries(invoice_id: int):
     return mock({"saved": True})
 
 
 # ---- Goi C (Duong) ----
-@router.post("/invoices/{invoice_id}/submit", tags=["C"])
+@router.post("/invoices/{invoice_id}/submit", tags=["C"], dependencies=[Depends(require_role("KTV"))])
 def submit(invoice_id: int):
     return mock({"status": "cho_duyet"})
 
@@ -58,7 +58,7 @@ def reject(invoice_id: int):
     return mock({"status": "tu_choi"})
 
 
-@router.get("/approvals", tags=["C"])
+@router.get("/approvals", tags=["C"], dependencies=[Depends(require_role("KTT"))])
 def approvals():
     return mock([{**SAMPLE_INVOICE, "status": "cho_duyet", "anomaly_score": 0.12}])
 
@@ -74,12 +74,12 @@ def list_pos():
                   "expected_amount": "1100000.00", "status": "open"}])
 
 
-@router.post("/purchase-orders", tags=["C"])
+@router.post("/purchase-orders", tags=["C"], dependencies=[Depends(require_role("KTV"))])
 def create_po():
     return mock({"po_id": 2})
 
 
-@router.post("/invoices/{invoice_id}/match-po", tags=["C"])
+@router.post("/invoices/{invoice_id}/match-po", tags=["C"], dependencies=[Depends(require_role("KTV"))])
 def match_po(invoice_id: int):
     return mock({"po_id": 1, "amount_difference": "0.00", "match_status": "khop"})
 

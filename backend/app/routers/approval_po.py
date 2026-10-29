@@ -180,7 +180,7 @@ def detect_anomalies_in_invoices(invoices):
     return invoices
 
 @router.get("/approvals")
-async def get_approvals(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+async def get_approvals(db: Session = Depends(get_db), current_user = Depends(require_role("KTT"))):
     invoices = db.query(Invoice).filter(Invoice.status == "cho_duyet").all()
     if not invoices:
         return {"data": []}
@@ -202,10 +202,12 @@ async def get_approvals(db: Session = Depends(get_db), current_user = Depends(ge
     return {"data": result_data}
 
 @router.post("/invoices/{invoice_id}/submit")
-async def submit_invoice(invoice_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+async def submit_invoice(invoice_id: int, db: Session = Depends(get_db), current_user = Depends(require_role("KTV"))):
     invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
+    if invoice.status not in ("cho_xac_nhan", "tu_choi"):
+        raise HTTPException(status_code=409, detail=f"Hóa đơn đang ở trạng thái “{invoice.status}”, không thể gửi duyệt")
     
     invoice.status = "cho_duyet"
     db.commit()
@@ -480,7 +482,7 @@ async def download_export(filename: str):
 # Nhiệm vụ C6: Nhập và Quản lý PO
 # ---------------------------------------------------------
 @router.get("/purchase-orders")
-async def get_purchase_orders(db: Session = Depends(get_db)):
+async def get_purchase_orders(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     pos = db.query(PurchaseOrder).order_by(PurchaseOrder.po_id.desc()).all()
     return {"data": pos}
 
@@ -488,7 +490,7 @@ async def get_purchase_orders(db: Session = Depends(get_db)):
 async def create_purchase_order(
     po_data: POCreate, 
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    current_user = Depends(require_role("KTV"))
 ):
     existing_po = db.query(PurchaseOrder).filter(PurchaseOrder.po_number == po_data.po_number).first()
     if existing_po:
@@ -517,7 +519,7 @@ async def create_purchase_order(
 async def match_po_with_invoice(
     invoice_id: int, 
     db: Session = Depends(get_db), 
-    current_user = Depends(get_current_user)
+    current_user = Depends(require_role("KTV"))
 ):
     invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
     if not invoice:

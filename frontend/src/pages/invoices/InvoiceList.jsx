@@ -4,9 +4,11 @@ import InvoiceDetail from "./InvoiceDetail.jsx";
 import StatusBadge from "./StatusBadge.jsx";
 import { dateVN, FILE_TYPE, money, STATUS } from "./format.js";
 import Pagination from "../../components/Pagination.jsx";
+import { isKTT, useUser } from "../../userContext.js";
 
 // Danh sach hoa don + bo loc.
 export default function InvoiceList({ refreshKey = 0 }) {
+  const canDelete = isKTT(useUser());   // chi ke toan truong moi thay nut Xoa (backend cung chan)
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
@@ -74,7 +76,8 @@ export default function InvoiceList({ refreshKey = 0 }) {
         method: "DELETE",
         body: { password: password.trim() } 
       });
-      load();
+      if (rows.length === 1 && currentPage > 1) setCurrentPage((p) => p - 1);   // xoa dong cuoi cua trang thi lui 1 trang
+      else load();
       setDeleteConfirmId(null);
       setPassword("");
     } catch (error) {
@@ -87,7 +90,7 @@ export default function InvoiceList({ refreshKey = 0 }) {
   return (
     <section className="relative">
       {/* POP-UP XÁC NHẬN XÓA BẰNG MẬT KHẨU */}
-      {deleteConfirmId && (
+      {canDelete && deleteConfirmId && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <form onSubmit={handleExecuteDelete} className="p-6 text-center">
@@ -167,9 +170,11 @@ export default function InvoiceList({ refreshKey = 0 }) {
                     <button className="text-blue-600 hover:text-blue-800 font-medium transition-colors" onClick={() => setSelected(r.invoice_id)}>
                       Xem
                     </button>
-                    <button className="text-red-500 hover:text-red-700 font-medium transition-colors" onClick={() => requestDelete(r.invoice_id)}>
-                      Xóa
-                    </button>
+                    {canDelete && (
+                      <button className="text-red-500 hover:text-red-700 font-medium transition-colors" onClick={() => requestDelete(r.invoice_id)}>
+                        Xóa
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
