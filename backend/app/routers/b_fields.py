@@ -21,7 +21,7 @@ from app.services.normalize import FIELD_NAMES, canonical
 
 router = APIRouter(prefix="/api/invoices", tags=["B"])
 
-EDITABLE_STATUSES = ("cho_xac_nhan", "tu_choi")  # da gui duyet / da duyet thi khoa, tranh sua duoi chan nguoi duyet
+EDITABLE_STATUSES = ("cho_xac_nhan", "da_luu", "tu_choi")  # da gui duyet / da duyet thi khoa, tranh sua duoi chan nguoi duyet
 MAX_LEN = {"invoice_series": 10, "invoice_number": 20, "mst_seller": 14, "seller_name": 200}  # theo cot bang invoices
 HINT = {"invoice_date": "ngày hợp lệ, ví dụ 23/06/2026", "vat_rate": "số, ví dụ 8 hoặc 10",
         "total_before_tax": "số tiền, ví dụ 3.882.100", "vat_amount": "số tiền, ví dụ 310.568",

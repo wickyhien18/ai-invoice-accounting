@@ -209,7 +209,7 @@ async def submit_invoice(invoice_id: int, db: Session = Depends(get_db), current
     invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
-    if invoice.status not in ("cho_xac_nhan", "tu_choi"):
+    if invoice.status not in ("cho_xac_nhan", "da_luu", "tu_choi"):
         raise HTTPException(status_code=409, detail=f"Hóa đơn đang ở trạng thái “{invoice.status}”, không thể gửi duyệt")
     
     invoice.status = "cho_duyet"

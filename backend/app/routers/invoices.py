@@ -34,7 +34,7 @@ ALLOWED = {
 }
 MEDIA = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg",
          ".jpeg": "image/jpeg", ".xml": "application/xml"}
-REPROCESSABLE = {"loi_xu_ly", "dang_xu_ly", "cho_xac_nhan"}
+REPROCESSABLE = {"loi_xu_ly", "dang_xu_ly", "cho_xac_nhan", "da_luu"}
 
 
 def _num(v: Decimal | None) -> str | None:

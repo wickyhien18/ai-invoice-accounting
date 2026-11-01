@@ -106,3 +106,34 @@ def test_catalog_read_for_all_edit_only_ktt(client):
     assert client.post(f"/api/categories/{cid}/aliases", json={"alias_text": "Thử nghiệm"}, headers=ktt).status_code == 201
     assert client.delete(f"/api/categories/{cid}", headers=ktv).status_code == 403
     assert client.delete(f"/api/categories/{cid}", headers=ktt).status_code == 200
+
+
+def test_batch_review_save_then_send_all(client):
+    """Kiem tra hang loat: luu tung hoa don (da_luu), gui ca lo mot lan -> cho_duyet; chi KTV."""
+    ids = [upload_xml(client) for _ in range(3)]
+    ktv, ktt = login(client, KTV), login(client, KTT)
+    assert client.post(f"/api/invoices/{ids[0]}/save-review", headers=ktt).status_code == 403
+    assert client.post("/api/invoices/submit-batch", headers=ktt).status_code == 403
+    from app.database import SessionLocal
+    from app.models import JournalEntry
+    assert client.post(f"/api/invoices/{ids[0]}/save-review", headers=ktv).status_code == 409   # chua co but toan
+    with SessionLocal() as db:
+        db.add_all([JournalEntry(invoice_id=i, debit_account="642", credit_account="331", amount=1) for i in ids[:2]])
+        db.commit()
+    for i in ids[:2]:
+        assert client.post(f"/api/invoices/{i}/save-review", headers=ktv).json()["data"]["status"] == "da_luu"
+    # da luu van sua lai duoc
+    assert client.get(f"/api/invoices/{ids[0]}/fields", headers=ktv).json()["editable"] is True
+    r = client.post("/api/invoices/submit-batch", headers=ktv)
+    assert r.json()["data"]["sent"] == 2                                     # hoa don thu 3 chua luu nen khong gui
+    assert client.get(f"/api/invoices/{ids[0]}", headers=ktv).json()["data"]["status"] == "cho_duyet"
+    assert client.get(f"/api/invoices/{ids[2]}", headers=ktv).json()["data"]["status"] == "cho_xac_nhan"
+    assert client.post(f"/api/invoices/{ids[0]}/save-review", headers=ktv).status_code == 409   # da gui thi khoa
+    assert client.post("/api/invoices/submit-batch", headers=ktv).json()["data"]["sent"] == 0
+    # chon tung hoa don: chi gui nhung cai duoc chon
+    with SessionLocal() as db:
+        db.add(JournalEntry(invoice_id=ids[2], debit_account="642", credit_account="331", amount=1))
+        db.commit()
+    assert client.post(f"/api/invoices/{ids[2]}/save-review", headers=ktv).status_code == 200
+    assert client.post("/api/invoices/submit-batch", json={"invoice_ids": []}, headers=ktv).json()["data"]["sent"] == 0
+    assert client.post("/api/invoices/submit-batch", json={"invoice_ids": [ids[2]]}, headers=ktv).json()["data"]["sent"] == 1

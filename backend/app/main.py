@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import approval_po, auth, b_catalog, b_entries, b_fields, health, invoices, mock_contract
+from app.routers import approval_po, auth, b_catalog, b_entries, b_fields, health, invoices, mock_contract, b_review
 from app.services.invoice_data import recover_stuck_in_thread
 
 
@@ -29,4 +29,5 @@ app.include_router(b_fields.router)
 app.include_router(b_entries.router)
 app.include_router(b_catalog.router)
 app.include_router(approval_po.router)
+app.include_router(b_review.router)
 app.include_router(mock_contract.router)

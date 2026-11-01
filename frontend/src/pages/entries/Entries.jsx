@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../api/client.js";
 import StatusBadge from "../invoices/StatusBadge.jsx";
 import { money } from "../invoices/format.js";
+import { LOT_NAME, fetchQueue, lotOf, nextUnsavedIn, prefetchPromise } from "../review/batch.js";
 
 // B7: man hinh dinh khoan. Hien goi y No/Co (kem nguon goi y), cho sua tung dong, roi luu.
-// Mo tu man hinh Kiem tra (nut "Tiep: Dinh khoan"). Goi y AI co the cham: trong luc cho van nhap tay duoc,
+// Mo tu man hinh Kiem tra (nut "Tiep: Dinh khoan"). "Luu & hoa don ke tiep" luu but toan, chot hoa don thanh "Da luu"
+// roi sang hoa don chua kiem tra ke tiep trong lo; het lo thi ve danh sach de chon gui. Goi y AI co the cham: trong luc cho van nhap tay duoc,
 // goi y den sau khong ghi de phan da nhap, va ban nhap duoc nho de quay lai khong phai hoi AI lai.
 const SOURCE = {
   history: ["Lịch sử người bán", "bg-green-100 text-green-800"],
@@ -56,6 +58,8 @@ function AccountSelect({ value, onChange, accounts, label, disabled }) {
 
 export default function Entries() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [queue, setQueue] = useState([]);       // lo kiem tra cua ke toan vien
   const id = params.get("id");
   const [inv, setInv] = useState(null);
   const [accounts, setAccounts] = useState([]);
@@ -102,6 +106,8 @@ export default function Entries() {
     }
   }
 
+  useEffect(() => { if (id) fetchQueue().then(setQueue).catch(() => {}); }, [id]);
+
   useEffect(() => {
     if (!id) return;
     const token = ++run.current;
@@ -115,11 +121,24 @@ export default function Entries() {
         const draft = j.editable && !j.data.length ? loadDraft(id) : null;
         if (j.data.length) {
           setRows(toRows(j.data, { source: "saved" })); setSaved(true); setBusy("");
-        } else if (draft) {                         // quay lai tu man hinh Kiem tra: dung ban nhap, KHONG hoi AI lai
+        } else if (draft) {                         // ban nhap / goi y nap truoc: dung luon, KHONG hoi AI lai
           setRows(toRows(draft)); setDirty(true); setBusy("");
-          setMsg("Đã khôi phục bản nháp của bạn. Bấm “Gợi ý lại” nếu muốn AI gợi ý mới.");
-        } else if (j.editable) { setBusy(""); suggest(); }
-        else setBusy("");
+          setMsg(draft[0]?.prefetched ? "AI đã gợi ý sẵn cho hóa đơn này. Bấm “Gợi ý lại” nếu muốn gợi ý mới."
+            : "Đã khôi phục bản nháp của bạn. Bấm “Gợi ý lại” nếu muốn AI gợi ý mới.");
+        } else if (j.editable) {
+          const pre = prefetchPromise(id);          // goi y dang duoc nap truoc: doi no thay vi goi AI lan nua
+          if (pre) {
+            setBusy("suggest"); setWait(0);
+            const timer = setInterval(() => setWait((w) => w + 1), 1000);
+            pre.finally(() => {
+              clearInterval(timer);
+              if (token !== run.current) return;
+              const d = loadDraft(id);
+              if (d) { setRows(toRows(d)); setDirty(true); setBusy(""); setMsg("AI đã gợi ý sẵn cho hóa đơn này."); }
+              else { setBusy(""); suggest(); }
+            });
+          } else { setBusy(""); suggest(); }
+        } else setBusy("");
       })
       .catch((e) => { if (token === run.current) { setErr(e.message); setBusy(""); } });
     return () => { sug.current++; };
@@ -149,20 +168,34 @@ export default function Entries() {
       setRows(toRows(r.data, { source: "saved" }));
       setWarnings(r.warnings || []); setDirty(false); setSaved(true); setMsg("Đã lưu bút toán.");
       saveDraft(id, null);
-    } catch (e) { setErr(e.message); } finally { setBusy(""); }
+      return true;
+    } catch (e) { setErr(e.message); return false; } finally { setBusy(""); }
   }
 
-  async function submit() {
-    if (!window.confirm("Gửi hóa đơn này cho kế toán trưởng duyệt? Sau khi gửi sẽ không sửa được trường và bút toán.")) return;
-    setBusy("submit"); setErr("");
+  // Luu but toan -> chot hoa don "Da luu" -> sang hoa don chua kiem tra ke tiep trong lo (het lo: ve danh sach de chon gui)
+  async function saveAndNext() {
+    if (!(await save())) return;
+    setBusy("save"); setErr("");
     try {
-      await api(`/api/invoices/${id}/submit`, { method: "POST" });
-      const i = await api(`/api/invoices/${id}`);
-      setInv(i.data); setEditable(false); setMsg("Đã gửi kế toán trưởng duyệt."); saveDraft(id, null);
-    } catch (e) { setErr(e.message); } finally { setBusy(""); }
+      await api(`/api/invoices/${id}/save-review`, { method: "POST" });
+    } catch (e) { setErr(e.message); setBusy(""); return; }
+    setBusy("");
+    const cur = Number(id);
+    const lotQ = queue.filter((q) => lotOf(q) === lotOf(inv)).map((q) => (q.invoice_id === cur ? { ...q, status: "da_luu" } : q));
+    const nxt = nextUnsavedIn(lotQ, cur);
+    navigate(nxt ? `/review?id=${nxt.invoice_id}` : "/review?tab=da_luu");
   }
 
   const sorted = useMemo(() => [...accounts].sort((a, b) => a.account_code.localeCompare(b.account_code)), [accounts]);
+
+  // chuyen sang hoa don truoc/sau trong cung lo (ban nhap duoc nho nen khong mat)
+  const lotQ = inv ? queue.filter((q) => lotOf(q) === lotOf(inv)) : [];
+  const pos = lotQ.findIndex((q) => q.invoice_id === Number(id));
+  const go = (to) => {
+    if (!to) return;
+    if (dirty && editable && !window.confirm("Có thay đổi chưa lưu (đã nhớ bản nháp). Vẫn chuyển hóa đơn?")) return;
+    setParams({ id: String(to.invoice_id) });
+  };
 
   // Dinh khoan chi mo tu man hinh Kiem tra (nut "Tiep: Dinh khoan"), nen khong co ?id thi quay ve Kiem tra
   if (!id) return <Navigate to="/review" replace />;
@@ -173,12 +206,20 @@ export default function Entries() {
   );
 
   return (
-    <section className="mx-auto max-w-6xl">
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+    <section className="mx-auto max-w-6xl pb-24">
+      {/* THANH DAU TRANG (dinh co dinh): hoa don dang lam + chuyen hoa don truoc/sau trong lo */}
+      <div className="sticky top-0 z-30 -mx-6 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-6 py-2 text-sm">
         <Link to="/review" className="text-blue-700 hover:underline">← Danh sách</Link>
         <h2 className="text-2xl font-bold text-slate-800">Định khoản hóa đơn #{inv.invoice_id}</h2>
         <StatusBadge status={inv.status} />
-        <Link to={`/review?id=${inv.invoice_id}`} className="ml-auto text-blue-700 hover:underline">← Kiểm tra trường</Link>
+        <Link to={`/review?id=${inv.invoice_id}`} className="text-blue-700 hover:underline">← Kiểm tra trường</Link>
+        {pos >= 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-600">{pos + 1}/{lotQ.length} trong {LOT_NAME[lotOf(inv)]} · đã lưu {lotQ.filter((q) => q.status === "da_luu").length}</span>
+            <button disabled={pos <= 0} onClick={() => go(lotQ[pos - 1])} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40">← Trước</button>
+            <button disabled={pos >= lotQ.length - 1} onClick={() => go(lotQ[pos + 1])} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40">Sau →</button>
+          </div>
+        )}
       </div>
       <dl className="mb-4 grid grid-cols-2 gap-x-6 gap-y-3 rounded-lg border border-slate-200 bg-white p-5 text-sm shadow md:grid-cols-4">
         <div><dt className="text-slate-500">Người bán</dt><dd className="font-semibold" title={inv.seller_name}>{inv.seller_name || "—"}</dd></div>
@@ -266,24 +307,25 @@ export default function Entries() {
         </table>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+      {/* THANH DAY MAN HINH (co dinh): cac nut thao tac */}
+      <div className="fixed inset-x-0 bottom-0 z-40 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-white px-6 py-3 text-sm shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
         {editable && <>
           <button disabled={!idle} onClick={() => { setRows((rs) => [...rs, newRow()]); touch(); }}
             className="rounded border bg-white px-4 py-2 font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50">+ Thêm dòng</button>
           <button disabled={busy !== "" } onClick={() => {
             if (!dirty || window.confirm("Gợi ý lại sẽ thay các dòng đang sửa. Tiếp tục?")) suggest({ replace: true });
           }} className="rounded border bg-white px-4 py-2 font-medium shadow-sm hover:bg-slate-50 disabled:opacity-50">Gợi ý lại</button>
-          <button disabled={!canSave} onClick={save} className="rounded bg-blue-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-blue-700 disabled:opacity-50">
+          <button disabled={!canSave} onClick={save} className="rounded border border-blue-600 bg-white px-4 py-2 font-semibold text-blue-700 shadow-sm hover:bg-blue-50 disabled:opacity-50">
             {busy === "save" ? "Đang lưu…" : "Lưu bút toán"}
           </button>
         </>}
-        {editable && saved && !dirty && (
-          <button disabled={busy !== ""} onClick={submit} className="rounded bg-green-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-green-700 disabled:opacity-50">
-            Gửi kế toán trưởng duyệt
-          </button>
-        )}
         {dirty && editable && <span className="text-amber-700">Có thay đổi chưa lưu (đã nhớ bản nháp trong tab này)</span>}
         {msg && <span role="status" className="text-green-700">{msg}</span>}
+        {editable && (
+          <button disabled={!canSave} onClick={saveAndNext} className="ml-auto rounded bg-blue-600 px-5 py-2 font-semibold text-white shadow-md hover:bg-blue-700 disabled:opacity-50">
+            {inv.status === "da_luu" ? "Lưu lại & hóa đơn kế tiếp →" : "Lưu & hóa đơn kế tiếp →"}
+          </button>
+        )}
       </div>
       <p className="mt-4 text-xs leading-relaxed text-slate-500">
         Gợi ý lấy theo thứ tự: lịch sử định khoản của người bán → loại khoản khớp tên người bán → mô hình ML → Gemini (người bán mới, mô hình chưa chắc) → mặc định.

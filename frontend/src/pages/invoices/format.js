@@ -3,6 +3,7 @@ export const STATUS = {
   dang_xu_ly: ["Đang xử lý", "bg-blue-100 text-blue-800"],
   loi_xu_ly: ["Lỗi xử lý", "bg-red-100 text-red-800"],
   cho_xac_nhan: ["Chờ xác nhận", "bg-amber-100 text-amber-800"],
+  da_luu: ["Đã lưu", "bg-teal-100 text-teal-800"],
   cho_duyet: ["Chờ duyệt", "bg-violet-100 text-violet-800"],
   da_duyet: ["Đã duyệt", "bg-green-100 text-green-800"],
   tu_choi: ["Từ chối", "bg-slate-200 text-slate-700"],

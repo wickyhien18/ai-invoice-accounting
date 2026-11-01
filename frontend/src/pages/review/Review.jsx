@@ -5,6 +5,8 @@ import StatusBadge from "../invoices/StatusBadge.jsx";
 import { FILE_TYPE } from "../invoices/format.js";
 import InvoicePicker from "./InvoicePicker.jsx";
 import FileViewer from "./FileViewer.jsx";
+import { isKTV, useUser } from "../../userContext.js";
+import { LOT_NAME, fetchQueue, lotOf, prefetchSuggestions } from "./batch.js";
 
 export const LABEL = {
   invoice_series: "Ký hiệu", invoice_number: "Số hóa đơn", invoice_date: "Ngày lập", seller_name: "Người bán",
@@ -118,10 +120,29 @@ export default function Review() {
   const [agree, setAgree] = useState(false);
   const [goBusy, setGoBusy] = useState(false);
   const [goErr, setGoErr] = useState("");
+  const user = useUser();
+  const [queue, setQueue] = useState([]);   // lo kiem tra: [{invoice_id, status, reject_reason}] theo thu tu
 
   const [showRedModal, setShowRedModal] = useState(false);
 
   useEffect(() => { try { localStorage.setItem(SPLIT_KEY, String(split)); } catch { /* bi chan: bo qua */ } }, [split]);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchQueue().then(setQueue).catch(() => {});
+  }, [id]);
+
+  // Trong luc kiem tra hoa don nay, nap truoc goi y but toan cho cac hoa don con lai trong lo (hoa don nay truoc)
+  useEffect(() => {
+    if (!id || !isKTV(user) || !queue.length) return;
+    const curId = Number(id);
+    const mine = queue.find((q) => q.invoice_id === curId);
+    if (!mine) return;
+    const lotQ = queue.filter((q) => lotOf(q) === lotOf(mine));
+    const p = lotQ.findIndex((q) => q.invoice_id === curId);
+    const ordered = [...lotQ.slice(p), ...lotQ.slice(0, p)].filter((q) => q.status !== "da_luu");
+    prefetchSuggestions(ordered.map((q) => q.invoice_id));
+  }, [id, queue, user]);
 
   useEffect(() => {
     if (!id) return;
@@ -157,12 +178,18 @@ export default function Review() {
   const todo = pending.length;
   const hasRed = pending.some((f) => levelOf(f) === "red");
   const empty = pending.filter((f) => f.value == null || String(f.value).trim() === "");
-  const next = `/entries?id=${inv.invoice_id}`;
+  const entriesUrl = `/entries?id=${inv.invoice_id}`;
+  const cur = Number(inv.invoice_id);
+  const lot = lotOf(inv);
+  const lotQ = queue.filter((q) => lotOf(q) === lot);          // chi di chuyen trong lo cua hoa don dang mo
+  const pos = lotQ.findIndex((q) => q.invoice_id === cur);
+  const savedCount = queue.filter((q) => q.status === "da_luu").length;
+  const open = (to) => to && setParams({ id: String(to.invoice_id) });
 
   // Sang Dinh khoan: con truong DO chua xac nhan -> chan (popup do);
   // con truong vang/chua ro -> hop thoai xac nhan, bam "xac nhan" se ghi nhan cac truong do la da kiem tra.
   function handleNextStep() {
-    if (!editable || todo === 0) return navigate(next);
+    if (!editable || todo === 0) return navigate(entriesUrl);
     if (hasRed) return setShowRedModal(true);
     setAgree(false); setGoErr(""); setAsk(true);
   }
@@ -170,12 +197,12 @@ export default function Review() {
     setGoBusy(true); setGoErr("");
     try {
       for (const f of pending) await save(f, f.value);
-      navigate(next);
+      navigate(entriesUrl);
     } catch (e) { setGoErr(e.message); setGoBusy(false); }
   }
 
   return (
-    <section className="relative mx-auto max-w-[110rem]">
+    <section className="relative mx-auto max-w-[110rem] pb-20">
 
       {/* POP-UP LỖI NGHIÊM TRỌNG (ĐỎ) */}
       {showRedModal && (
@@ -201,23 +228,24 @@ export default function Review() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+      {/* THANH DAU TRANG (dinh co dinh): thong tin hoa don + chuyen hoa don truoc/sau trong lo */}
+      <div className="sticky top-0 z-30 -mx-6 mb-4 flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-6 py-2 text-sm">
         <button className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1" onClick={() => setParams({})}>← Trở lại</button>
         <div className="w-px h-4 bg-slate-300 mx-1"></div>
         <h1 className="text-xl font-bold text-slate-800">Hóa đơn #{inv.invoice_id}</h1>
         <StatusBadge status={inv.status} />
         <span className="min-w-0 truncate text-slate-500 font-medium bg-slate-100 px-2 py-1 rounded">{FILE_TYPE[inv.file_type]} · {inv.filename}</span>
-
-        <button
-          onClick={handleNextStep}
-          className={`ml-auto w-full rounded-lg px-4 py-1.5 font-medium shadow-sm transition-colors sm:w-auto ${hasRed ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-        >
-          Tiếp: Định khoản →
-        </button>
+        {pos >= 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="rounded bg-slate-100 px-2 py-1 font-medium text-slate-600">{pos + 1}/{lotQ.length} trong {LOT_NAME[lot]} · đã lưu {lotQ.filter((q) => q.status === "da_luu").length}</span>
+            <button disabled={pos <= 0} onClick={() => open(lotQ[pos - 1])} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40">← Trước</button>
+            <button disabled={pos >= lotQ.length - 1} onClick={() => open(lotQ[pos + 1])} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-40">Sau →</button>
+          </div>
+        )}
       </div>
       {!editable && (
         <p className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 font-medium flex items-center gap-2">
-          <span>⚠️</span> Hóa đơn đang ở trạng thái “{inv.status}” nên chỉ xem, không sửa được. Chỉ sửa được khi "Chờ xác nhận" hoặc "Bị từ chối".
+          <span>⚠️</span> Hóa đơn đang ở trạng thái “{inv.status}” nên chỉ xem, không sửa được. Chỉ sửa được khi "Chờ xác nhận", "Đã lưu" hoặc "Từ chối".
         </p>
       )}
       {inv.status === "tu_choi" && inv.reject_reason && (
@@ -293,6 +321,21 @@ export default function Review() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* THANH DAY MAN HINH (co dinh): sang Dinh khoan / xem & gui cac hoa don da luu */}
+      {isKTV(user) && (
+        <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-6 py-3 shadow-[0_-2px_8px_rgba(0,0,0,0.08)]">
+          {savedCount > 0 ? (
+            <button onClick={() => setParams({ tab: "da_luu" })} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-700">
+              Xem & gửi hóa đơn đã lưu ({savedCount})
+            </button>
+          ) : <span />}
+          <button onClick={handleNextStep}
+            className={`rounded-lg px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${hasRed ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700"}`}>
+            Tiếp: Định khoản →
+          </button>
         </div>
       )}
     </section>

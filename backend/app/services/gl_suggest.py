@@ -7,7 +7,10 @@
 
 Moi dong tra ve co "source" de ke toan biet goi y den tu dau.
 """
+import os
 import re
+import threading
+import time
 import unicodedata
 from collections import Counter
 from decimal import ROUND_HALF_UP, Decimal
@@ -20,10 +23,35 @@ from app.services import gl_client
 
 VAT_ACCOUNT = "1331"
 DEFAULT_DEBIT, DEFAULT_CREDIT = "6422", "331"
-HISTORY_STATUSES = ("cho_duyet", "da_duyet")  # chi tin dinh khoan da qua buoc gui duyet
+# Tin dinh khoan da qua kiem tra cua ke toan vien ("da_luu") hoac da gui duyet: kiem tra hang loat thi hoa don sau
+# cung nguoi ban voi hoa don truoc co ngay goi y tu lich su, khong phai hoi ML/Gemini lai
+HISTORY_STATUSES = ("da_luu", "cho_duyet", "da_duyet")
 # Khong dua cho Gemini chon: von/doanh thu/thu nhap/xac dinh ket qua va cac TK thue (thue do he thong tu them)
 LLM_EXCLUDED_PREFIXES = ("133", "333", "4", "5", "7", "9", "821")
 CENT = Decimal("0.01")
+
+# Nho tam ket qua ai-service theo (nguoi ban, thue suat): hoa don cung nguoi ban trong mot lo khong phai goi ML/Gemini lai
+# (Gemini ban mien phi gioi han so lan/phut nen goi lap lai la ly do goi y cham dan). Chi nho ket qua THANH CONG.
+_ML_CACHE: dict[tuple, tuple[float, dict]] = {}
+_ML_LOCK = threading.Lock()
+ML_CACHE_TTL = 600.0   # giay
+ML_CACHE_MAX = 500
+
+
+def _cached_classify(payload: dict) -> dict | None:
+    key = (fold(payload.get("seller_name")), payload.get("vat_rate"))
+    now = time.monotonic()
+    with _ML_LOCK:
+        hit = _ML_CACHE.get(key)
+        if hit and now - hit[0] < ML_CACHE_TTL:
+            return dict(hit[1])
+    ml = gl_client.classify_gl(payload)
+    if ml and key[0] and not ml.get("llm_error"):   # Gemini loi/het luot: khong nho, lan sau thu lai
+        with _ML_LOCK:
+            if len(_ML_CACHE) >= ML_CACHE_MAX:
+                _ML_CACHE.clear()
+            _ML_CACHE[key] = (now, dict(ml))
+    return ml
 
 
 def fold(s: str | None) -> str:
@@ -106,10 +134,13 @@ def suggest(db: Session, inv: Invoice) -> dict:
 
     if main is None:
         usable = [{"code": k, "name": v} for k, v in accounts.items() if not k.startswith(LLM_EXCLUDED_PREFIXES)]
-        ml = gl_client.classify_gl({
+        ml = _cached_classify({
             "seller_name": inv.seller_name, "vat_rate": float(inv.vat_rate) if inv.vat_rate is not None else None,
             "total_before_tax": float(before),
-            "use_llm": True,  # toi day nghia la khong co lich su -> nguoi ban moi
+            # toi day nghia la khong co lich su -> nguoi ban moi. Gemini ban mien phi: 13 s/lan, ~18 lan/ngay DUNG CHUNG
+            # voi buoc doc hoa don anh (llm.py), nen dat GL_USE_LLM=0 (backend/.env) de goi y chi dung ML (tuc thi), de danh
+            # luot Gemini cho doc hoa don. Mac dinh 1 = giu hanh vi cu.
+            "use_llm": os.getenv("GL_USE_LLM", "1").lower() not in ("0", "false", "no"),
             "accounts": usable,
         })
         if ml and ml.get("debit_account") in accounts and ml.get("credit_account") in accounts \
