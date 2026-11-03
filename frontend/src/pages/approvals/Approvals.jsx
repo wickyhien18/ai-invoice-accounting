@@ -1,19 +1,114 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { api } from "../../api/client.js";
 import Pagination from "../../components/Pagination.jsx";
 import FileViewer from "../review/FileViewer.jsx";
 
-// Cửa sổ đối chiếu nhanh dành cho Kế toán trưởng
-const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
+// --- COMPONENT: Loading Spinner ---
+const Spinner = () => (
+  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
+
+// --- COMPONENT: Dropdown Duyệt/Từ chối tại chỗ ---
+const InlineActionDropdown = ({ invoiceId, onApprove, onReject, isProcessing }) => {
+  const [showApprove, setShowApprove] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [reason, setReason] = useState("");
+  
+  const approveRef = useRef(null);
+  const rejectRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (approveRef.current && !approveRef.current.contains(e.target)) setShowApprove(false);
+      if (rejectRef.current && !rejectRef.current.contains(e.target)) setShowReject(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="inline-flex gap-2 justify-center items-center">
+      {/* Cụm Duyệt */}
+      <div className="relative" ref={approveRef}>
+        <button 
+          onClick={() => { setShowApprove(!showApprove); setShowReject(false); }} 
+          className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded shadow-sm transition-colors text-sm font-medium"
+        >
+          Duyệt
+        </button>
+        {showApprove && (
+          <div className="absolute top-full right-0 mt-2 w-48 bg-white border shadow-xl rounded-lg p-3 z-50 text-left animate-in fade-in zoom-in-95 duration-100">
+            <p className="text-sm font-medium mb-3 text-slate-700">Duyệt hóa đơn #{invoiceId}?</p>
+            <button 
+              disabled={isProcessing} 
+              onClick={() => onApprove(invoiceId, () => setShowApprove(false))} 
+              className="w-full flex items-center justify-center bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm transition-colors disabled:opacity-70 font-medium"
+            >
+              {isProcessing ? <Spinner /> : "Xác nhận Duyệt"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Cụm Từ chối */}
+      <div className="relative" ref={rejectRef}>
+        <button 
+          onClick={() => { setShowReject(!showReject); setShowApprove(false); }} 
+          className="text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded shadow-sm transition-colors text-sm font-medium"
+        >
+          Từ chối
+        </button>
+        {showReject && (
+          <div className="absolute top-full right-0 mt-2 w-64 bg-white border shadow-xl rounded-lg p-3 z-50 text-left animate-in fade-in zoom-in-95 duration-100">
+            <label className="block text-xs font-semibold mb-2 text-slate-700 uppercase">Lý do từ chối:</label>
+            <textarea 
+              value={reason} 
+              onChange={(e) => setReason(e.target.value)} 
+              disabled={isProcessing} 
+              placeholder="VD: Sai mã số thuế..." 
+              className="w-full border rounded-md p-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50" 
+              rows="2" 
+            />
+            <button 
+              disabled={isProcessing} 
+              onClick={() => {
+                if(!reason.trim()) { alert("Vui lòng nhập lý do từ chối!"); return; }
+                onReject(invoiceId, reason, () => { setShowReject(false); setReason(""); });
+              }} 
+              className="w-full flex items-center justify-center bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm transition-colors disabled:opacity-70 font-medium"
+            >
+              {isProcessing ? <Spinner /> : "Xác nhận Từ chối"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- COMPONENT: Cửa sổ đối chiếu nhanh ---
+const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject, isProcessing }) => {
   const [inv, setInv] = useState(null);
   const [entries, setEntries] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const [showRejectInput, setShowRejectInput] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const rejectRef = useRef(null);
+
+  // Reset form từ chối mỗi khi đổi sang hóa đơn mới
+  useEffect(() => {
+    setShowRejectInput(false);
+    setRejectReason("");
+  }, [invoiceId]);
 
   useEffect(() => {
     let dead = false;
     setLoading(true);
 
-    // File goc do FileViewer tu tai (anh / PDF / XML dang hoa don), o day chi lay du lieu va but toan
     Promise.all([
       api(`/api/invoices/${invoiceId}`),
       api(`/api/invoices/${invoiceId}/journal-entries`).catch(() => ({ data: [] })),
@@ -29,6 +124,14 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
 
     return () => { dead = true; };
   }, [invoiceId]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (rejectRef.current && !rejectRef.current.contains(e.target)) setShowRejectInput(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   if (loading) return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 text-white backdrop-blur-sm">
@@ -50,12 +153,48 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
            {inv.is_anomaly && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-xs font-bold shadow-sm">⚠️ Rủi ro cao</span>}
          </div>
          <div className="flex gap-3">
-            <button onClick={() => onApprove(inv.invoice_id)} className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
-              ✓ Duyệt nhanh
+            <button 
+              onClick={() => onApprove(inv.invoice_id)} 
+              disabled={isProcessing}
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors flex items-center disabled:opacity-70"
+            >
+              {isProcessing ? <Spinner /> : "✓ Duyệt nhanh"}
             </button>
-            <button onClick={() => { onClose(); onReject(inv.invoice_id); }} className="bg-red-600 hover:bg-red-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors">
-              ✕ Từ chối
-            </button>
+            
+            <div className="relative" ref={rejectRef}>
+              <button 
+                onClick={() => setShowRejectInput(!showRejectInput)} 
+                disabled={isProcessing}
+                className="bg-red-600 hover:bg-red-700 text-white px-5 py-1.5 rounded font-medium shadow-sm transition-colors flex items-center disabled:opacity-70"
+              >
+                ✕ Từ chối
+              </button>
+              {showRejectInput && (
+                <div className="absolute top-full right-0 mt-2 w-72 bg-white border shadow-xl rounded-lg p-4 z-[70] animate-in fade-in zoom-in-95 duration-100 text-left">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Lý do từ chối:</label>
+                  <textarea 
+                    value={rejectReason} 
+                    onChange={e => setRejectReason(e.target.value)}
+                    className="w-full border rounded-md p-2 mb-3 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50"
+                    rows="3" placeholder="Nhập lý do..." disabled={isProcessing}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setShowRejectInput(false)} className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded text-sm font-medium">Hủy</button>
+                    <button 
+                      onClick={() => {
+                        if(!rejectReason.trim()) { alert("Vui lòng nhập lý do!"); return; }
+                        onReject(inv.invoice_id, rejectReason, () => setShowRejectInput(false));
+                      }} 
+                      disabled={isProcessing} 
+                      className="px-4 py-1.5 bg-red-600 text-white rounded text-sm font-medium flex items-center disabled:opacity-70"
+                    >
+                      {isProcessing ? <Spinner /> : "Xác nhận"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="w-px bg-slate-300 mx-1"></div>
             <button onClick={onClose} className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-4 py-1.5 rounded font-medium transition-colors">
               Đóng
@@ -154,16 +293,13 @@ const QuickReviewModal = ({ invoiceId, onClose, onApprove, onReject }) => {
   );
 };
 
+// --- COMPONENT CHÍNH ---
 export default function Approvals() {
   const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [rejectingId, setRejectingId] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  
-  const [confirmApproveId, setConfirmApproveId] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
   const [showAnomalyModal, setShowAnomalyModal] = useState(false);
   const [viewingId, setViewingId] = useState(null);
   const [highlightedId, setHighlightedId] = useState(null);
@@ -175,8 +311,8 @@ export default function Approvals() {
     setLoading(true);
     api("/api/approvals")
       .then((res) => {
-        setInvoices(res?.data || res || []);
-        setCurrentPage(1);
+        const data = res?.data || res || [];
+        setInvoices(data);
       })
       .catch((err) => console.error("Lỗi tải data:", err))
       .finally(() => setLoading(false));
@@ -198,39 +334,51 @@ export default function Approvals() {
     return seller.includes(query) || invNum.includes(query) || invId.includes(query);
   });
 
-  const handleConfirmApprove = (id) => setConfirmApproveId(id);
+  // Tự động căn chỉnh trang khi xóa/duyệt bớt dữ liệu
+  const maxPage = Math.max(1, Math.ceil(filteredInvoices.length / pageSize));
+  useEffect(() => {
+    if (currentPage > maxPage) {
+      setCurrentPage(maxPage);
+    }
+  }, [filteredInvoices.length, currentPage, maxPage]);
 
-  const executeApprove = () => {
-    if (!confirmApproveId) return;
-    setSubmitting(true);
-    api(`/api/invoices/${confirmApproveId}/approve`, { method: "POST" })
-      .then(() => {
-        alert(`Hóa đơn ${confirmApproveId} đã được phê duyệt!`);
-        if (rejectingId === confirmApproveId) closeRejectForm(); 
-        if (viewingId === confirmApproveId) setViewingId(null);
-        setConfirmApproveId(null);
-        fetchApprovals();
-      })
-      .catch(() => alert("Lỗi khi duyệt hóa đơn."))
-      .finally(() => setSubmitting(false));
+  const handleAutoNext = (currentId) => {
+    if (!viewingId) return; 
+    const index = filteredInvoices.findIndex(inv => (inv.invoice_id || inv.id) === currentId);
+    if (index !== -1 && index < filteredInvoices.length - 1) {
+      const nextId = filteredInvoices[index + 1].invoice_id || filteredInvoices[index + 1].id;
+      setViewingId(nextId);
+    } else {
+      setViewingId(null);
+    }
   };
 
-  const openRejectForm = (id) => { setRejectingId(id); setRejectReason(""); };
-  const closeRejectForm = () => { setRejectingId(null); setRejectReason(""); };
+  const handleProcessApprove = async (id, callback) => {
+    setProcessingId(id);
+    try {
+      await api(`/api/invoices/${id}/approve`, { method: "POST" });
+      if (callback) callback();
+      handleAutoNext(id);
+      fetchApprovals();
+    } catch (err) {
+      alert("Lỗi khi duyệt hóa đơn.");
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
-  const submitReject = (e) => {
-    e.preventDefault();
-    if (!rejectReason.trim()) { alert("Vui lòng nhập lý do từ chối!"); return; }
-    setSubmitting(true);
-    api(`/api/invoices/${rejectingId}/reject?reason=${encodeURIComponent(rejectReason)}`, { method: "POST" })
-      .then(() => {
-        alert(`Hóa đơn ${rejectingId} đã bị từ chối.`);
-        closeRejectForm();
-        if (viewingId === rejectingId) setViewingId(null);
-        fetchApprovals();
-      })
-      .catch(() => alert("Lỗi khi từ chối hóa đơn."))
-      .finally(() => setSubmitting(false));
+  const handleProcessReject = async (id, reason, callback) => {
+    setProcessingId(id);
+    try {
+      await api(`/api/invoices/${id}/reject?reason=${encodeURIComponent(reason)}`, { method: "POST" });
+      if (callback) callback();
+      handleAutoNext(id);
+      fetchApprovals();
+    } catch (err) {
+      alert("Lỗi khi từ chối hóa đơn.");
+    } finally {
+      setProcessingId(null);
+    }
   };
 
   const scrollToInvoice = (id) => {
@@ -256,27 +404,16 @@ export default function Approvals() {
 
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 relative">
-      {confirmApproveId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-green-50 shadow-inner">
-                <span className="text-3xl font-bold text-green-600">✓</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Xác nhận phê duyệt</h3>
-              <p className="text-slate-600 mb-8 leading-relaxed text-sm">
-                Bạn có chắc chắn muốn duyệt Hóa đơn <b className="text-slate-900">#{confirmApproveId}</b> không? Dữ liệu sẽ chính thức được ghi nhận.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button disabled={submitting} onClick={() => setConfirmApproveId(null)} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-colors w-1/2">Hủy bỏ</button>
-                <button disabled={submitting} onClick={executeApprove} className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold transition-colors shadow-md w-1/2 flex justify-center items-center">{submitting ? "Đang xử lý..." : "Đồng ý Duyệt"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {viewingId && <QuickReviewModal invoiceId={viewingId} onClose={() => setViewingId(null)} onApprove={handleConfirmApprove} onReject={openRejectForm} />}
+      {viewingId && (
+        <QuickReviewModal 
+          invoiceId={viewingId} 
+          onClose={() => setViewingId(null)} 
+          onApprove={handleProcessApprove} 
+          onReject={handleProcessReject}
+          isProcessing={processingId === viewingId}
+        />
+      )}
 
       <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
@@ -292,13 +429,12 @@ export default function Approvals() {
             <input type="text" placeholder="Tìm Nhà cung cấp, Số HĐ..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-8 py-1.5 border border-slate-300 rounded text-sm focus:outline-none focus:border-blue-500" />
             {searchQuery && <button onClick={() => setSearchQuery("")} className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 font-bold">✕</button>}
           </div>
-          {rejectingId && <button onClick={closeRejectForm} className="text-sm font-medium text-slate-500 hover:text-slate-700 bg-white border border-slate-300 px-3 py-1.5 rounded transition-colors whitespace-nowrap">Đóng form</button>}
         </div>
       </div>
 
       {showAnomalyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden border border-slate-200">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
               <h3 className="text-lg font-bold text-red-700">Danh sách Hóa đơn có rủi ro cao</h3>
               <button onClick={() => setShowAnomalyModal(false)} className="text-slate-400 hover:text-slate-700 text-xl font-bold">✕</button>
@@ -328,24 +464,11 @@ export default function Approvals() {
         </div>
       )}
 
-      {rejectingId && (
-        <form onSubmit={submitReject} className="p-6 bg-red-50 border-b border-red-200 flex flex-col md:flex-row gap-4 items-end">
-          <div className="flex-1 w-full">
-            <label className="block text-xs font-semibold text-red-800 uppercase mb-1">Lý do từ chối Hóa đơn #{rejectingId} <span className="text-red-600">*</span></label>
-            <input type="text" placeholder="VD: Sai mã số thuế, số tiền không khớp PO..." value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} className="w-full border border-red-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500 bg-white" autoFocus required />
-          </div>
-          <div className="flex gap-2">
-            <button type="button" onClick={closeRejectForm} className="bg-slate-300 hover:bg-slate-400 text-slate-800 px-4 py-2 rounded text-sm font-medium transition-colors">Hủy</button>
-            <button type="submit" disabled={submitting} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">{submitting ? "Đang xử lý..." : "Xác nhận từ chối"}</button>
-          </div>
-        </form>
-      )}
-
       {filteredInvoices.length === 0 ? (
         <div className="p-12 text-center text-slate-500">{searchQuery ? `Không tìm thấy hóa đơn nào chứa "${searchQuery}".` : "Không có hóa đơn nào đang chờ duyệt."}</div>
       ) : (
         <div className="flex flex-col">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[300px] pb-24">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-100">
                 <tr>
@@ -359,10 +482,11 @@ export default function Approvals() {
               <tbody className="divide-y divide-slate-200 bg-white">
                 {currentInvoices.map((inv) => {
                   const currentId = inv.invoice_id || inv.id;
-                  const isRejecting = rejectingId === currentId;
                   const isHighlighted = highlightedId === currentId;
+                  const isRowProcessing = processingId === currentId;
+
                   return (
-                    <tr id={`invoice-row-${currentId}`} key={currentId} className={`${isHighlighted ? "bg-blue-50 ring-2 ring-blue-400 ring-inset shadow-inner" : isRejecting ? "bg-red-100" : inv.is_anomaly ? "bg-red-50 hover:bg-red-100" : "hover:bg-slate-50"} transition-colors`}>
+                    <tr id={`invoice-row-${currentId}`} key={currentId} className={`${isHighlighted ? "bg-blue-50 ring-2 ring-blue-400 ring-inset shadow-inner" : inv.is_anomaly ? "bg-red-50 hover:bg-red-100" : "hover:bg-slate-50"} transition-colors`}>
                       <td className={`px-6 py-4 text-sm ${inv.is_anomaly ? "text-red-700 font-bold" : "text-slate-900"}`}>{currentId}</td>
                       <td className={`px-6 py-4 text-sm font-medium ${inv.is_anomaly ? "text-red-600" : "text-blue-600"}`}>{inv.invoice_number || "N/A"}</td>
                       <td className="px-6 py-4 text-sm text-slate-500">
@@ -372,10 +496,22 @@ export default function Approvals() {
                         </div>
                       </td>
                       <td className={`px-6 py-4 text-sm font-semibold ${inv.is_anomaly ? "text-red-700" : "text-slate-900"}`}>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(inv.total_amount || inv.total || 0)}</td>
-                      <td className="px-6 py-4 text-center text-sm font-medium whitespace-nowrap">
-                        <button onClick={() => setViewingId(currentId)} className="text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-3 py-1.5 rounded mr-2 shadow-sm">👁️ Kiểm tra</button>
-                        <button onClick={() => handleConfirmApprove(currentId)} className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded mr-2 shadow-sm">Duyệt</button>
-                        <button onClick={() => openRejectForm(currentId)} className={`px-3 py-1.5 rounded shadow-sm ${isRejecting ? "bg-red-800 text-white" : "text-white bg-red-600 hover:bg-red-700"}`}>Từ chối</button>
+                      <td className="px-6 py-4 text-center whitespace-nowrap">
+                        <div className="flex justify-center items-center gap-2">
+                          <button 
+                            onClick={() => setViewingId(currentId)} 
+                            className="text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 px-3 py-1.5 rounded shadow-sm text-sm font-medium transition-colors"
+                          >
+                            👁️ Kiểm tra
+                          </button>
+                          
+                          <InlineActionDropdown 
+                            invoiceId={currentId} 
+                            onApprove={handleProcessApprove} 
+                            onReject={handleProcessReject} 
+                            isProcessing={isRowProcessing}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
