@@ -91,7 +91,7 @@ function Checks({ c }) {
   const d = c.issue_details || { mst: [], totals: [], duplicate: [] };
   const rows = [["MST người bán đúng định dạng", c.mst_valid, d.mst],
     ["Tiền trước thuế + thuế = tổng thanh toán", c.total_matches, d.totals],
-    ["Không trùng hóa đơn đã có", !c.duplicate, d.duplicate]];
+    ["Không trùng hóa đơn đã có", c.duplicate ? false : c.duplicate_checked === false ? null : true, d.duplicate]];
   return (
     <section className="rounded border bg-white p-3 text-sm shadow-sm">
       <h3 className="mb-2 font-bold text-slate-700 border-b pb-1">Kiểm tra sơ bộ tự động</h3>

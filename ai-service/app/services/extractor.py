@@ -225,7 +225,10 @@ def extract_fields(ocr: dict, use_llm: bool = True) -> dict:
             chosen[name] = (rules[name], "rules", None)
         else:
             chosen[name] = (None, "none", None)
-    repair_amounts(chosen, warnings)
+    # PDF co lop chu la van ban CHINH XAC: so tien khac phep tinh la loi cua hoa don, khong phai loi OCR. Tu sua o day
+    # se bien hoa don sai thanh dung va che mat loi tu buoc kiem tra so bo (Bug 26: ST003 tong sai, ST019 lech 1 dong)
+    if ocr.get("source") != "pdf_text":
+        repair_amounts(chosen, warnings)
     arith = arithmetic_ok({n: v[0] for n, v in chosen.items()})
     if arith is False:
         warnings.append("Tiền trước thuế + thuế khác tổng thanh toán, hoặc thuế suất không khớp tiền thuế")

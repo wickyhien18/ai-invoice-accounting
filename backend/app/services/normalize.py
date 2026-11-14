@@ -15,7 +15,11 @@ MONEY_FIELDS = {"total_before_tax", "vat_amount", "total_amount"}
 
 
 def parse_money(value) -> Decimal | None:
-    """'4.192.668' / '4,192,668' / '4192668' / '1100000.00' -> Decimal. Tra None neu khong doc duoc."""
+    """Doc so tien o moi dang: '4.192.668', '4,192,668', '49,632,990.00', '1.100.000,50', '1100000.00' -> Decimal.
+
+    Dau phan cach CUOI CUNG la dau thap phan khi co tu 1-2 chu so dung sau no; dau con lai la phan nghin.
+    Chi co mot loai dau, xuat hien 1 lan, theo sau dung 3 chu so ('1.100', '1,100') thi la phan nghin (kieu Viet Nam).
+    Tra None neu khong doc duoc."""
     if value is None:
         return None
     if isinstance(value, (int, float, Decimal)):
@@ -24,12 +28,21 @@ def parse_money(value) -> Decimal | None:
     if not s:
         return None
     s = re.sub(r"(?i)\s*(vnd|vnđ|đ|dong|đồng)\s*$", "", s).strip()
-    if re.fullmatch(r"\d+\.\d{1,2}", s):  # '1100000.00': dau cham la dau thap phan
-        return Decimal(s)
-    digits = re.sub(r"[^\d]", "", s)
-    if not digits:
+    s = re.sub(r"[^\d.,]", "", s)
+    if not re.search(r"\d", s):
         return None
-    return Decimal(digits)
+    last = max(s.rfind("."), s.rfind(","))
+    if last == -1:
+        return Decimal(s)
+    head, sep, tail = s[:last], s[last], s[last + 1:]
+    other = "," if sep == "." else "."
+    if other in head or (sep not in head and len(tail) in (1, 2)):
+        is_decimal = len(tail) in (1, 2)          # '49,632,990.00' / '1.100.000,50' / '1100000.00'
+    else:
+        is_decimal = False                        # '4.192.668' / '1,100' / '1.100'
+    if is_decimal:
+        return Decimal(re.sub(r"[.,]", "", head) + "." + tail)
+    return Decimal(re.sub(r"[.,]", "", s))
 
 
 def parse_rate(value) -> Decimal | None:
@@ -68,11 +81,12 @@ def parse_date(value) -> date | None:
 
 
 def clean_mst(value) -> str | None:
-    """Giu chu so va dau '-'. '0487 211 601' -> '0487211601'."""
+    """Bo khoang trang va dau cham/phay, GIU chu so, chu cai va '-': '0487 211 601' -> '0487211601'.
+    Chu cai KHONG bi bo (Bug 25): '0172A69957' phai hien nguyen de ke toan thay MST sai, khong bien thanh 9 chu so."""
     if value is None:
         return None
-    s = re.sub(r"[^\d\-]", "", str(value))
-    return s.strip("-") or None
+    s = re.sub(r"[^0-9A-Za-z\-]", "", str(value)).upper().strip("-")
+    return s if sum(c.isdigit() for c in s) >= 5 else None   # chu thuan ("chua co") khong phai MST
 
 
 def clean_text(value) -> str | None:

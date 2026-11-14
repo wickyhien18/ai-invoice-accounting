@@ -169,7 +169,7 @@ function CheckResult({ c }) {
   const d = c.issue_details || { mst: [], totals: c.issues || [], duplicate: [] };
   const mst = c.mst_valid ? "ok" : "bad";
   const totals = c.total_matches === null ? "unknown" : c.total_matches ? "ok" : "bad";
-  const dup = c.duplicate ? "bad" : "ok";
+  const dup = c.duplicate ? "bad" : c.duplicate_checked === false ? "unknown" : "ok";
   const bad = [mst, totals, dup].filter((x) => x === "bad").length;
   const unknown = [mst, totals, dup].filter((x) => x === "unknown").length;
   return (
@@ -187,7 +187,7 @@ function CheckResult({ c }) {
             : totals === "bad" ? "Tổng tiền không khớp" : "Chưa kiểm tra được tổng tiền"}
           details={d.totals} />
         <Check state={dup}
-          label={dup === "ok" ? "Không trùng hóa đơn đã có" : "Trùng với hóa đơn đã có"} details={d.duplicate} />
+          label={dup === "ok" ? "Không trùng hóa đơn đã có" : dup === "bad" ? "Trùng với hóa đơn đã có" : "Chưa kiểm tra được trùng hóa đơn"} details={d.duplicate} />
       </ul>
       {c.vendor_suggestion && (
         <p className="mt-3 text-slate-600">Gợi ý tên chuẩn: <b>{c.vendor_suggestion.canonical}</b></p>

@@ -40,3 +40,53 @@ def test_check_totals():
     ok, issues = check_totals(Decimal(1000), Decimal(8), Decimal(100), Decimal(1100))  # thue suat khong khop tien thue
     assert ok is False
     assert check_totals(None, None, None, None)[0] is None
+
+
+# ---- Bug 24 / 25: doc so tien moi dang va giu chu cai trong MST
+import pytest as _pytest  # noqa: E402
+from decimal import Decimal as _D  # noqa: E402
+
+MONEY_CASES = [
+    ("4.192.668", "4192668"), ("4,192,668", "4192668"), ("4192668", "4192668"), ("1100000.00", "1100000.00"),
+    ("49,632,990.00", "49632990.00"), ("1.100.000,50", "1100000.50"), ("17,462,720.00", "17462720.00"),
+    ("1.100", "1100"), ("1,100", "1100"), ("1,5", "1.5"), ("12.5", "12.5"), ("  3.882.100 đ", "3882100"),
+    ("1.234.567 VND", "1234567"), ("0", "0"),
+]
+
+
+@_pytest.mark.parametrize("raw,want", MONEY_CASES)
+def test_parse_money_formats(raw, want):
+    from app.services.normalize import parse_money
+    assert parse_money(raw) == _D(want)
+
+
+def test_parse_money_unreadable():
+    from app.services.normalize import parse_money
+    assert parse_money("") is None and parse_money("abc") is None and parse_money(None) is None
+
+
+def test_canonical_money_no_x100():
+    from app.services.normalize import canonical
+    assert canonical("total_amount", "49,632,990.00") == "49632990"      # tung ra 4963299000
+
+
+def test_mst_text_only_is_rejected():
+    from app.services.normalize import canonical
+    assert canonical("mst_seller", "chưa có") is None and canonical("mst_seller", "abc") is None
+
+
+def test_mst_keeps_letters_so_error_is_visible():
+    from app.services.normalize import canonical
+    assert canonical("mst_seller", "0172A69957") == "0172A69957"           # tung bi bien thanh 017269957
+    assert canonical("mst_seller", "0487 211 601") == "0487211601"
+    assert canonical("mst_seller", "0100109106-001") == "0100109106-001"
+
+
+def test_duplicate_check_reports_when_it_could_not_run():
+    from types import SimpleNamespace
+    from app.services import checks
+    full = SimpleNamespace(invoice_series="C26MBF", invoice_number="1", mst_seller="0487211601")
+    assert checks.can_check_duplicate(full) is True
+    for missing in ("invoice_series", "invoice_number", "mst_seller"):
+        inv = SimpleNamespace(**{**full.__dict__, missing: None})
+        assert checks.can_check_duplicate(inv) is False

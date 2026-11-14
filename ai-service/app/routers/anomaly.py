@@ -1,8 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Optional
-import numpy as np
-from sklearn.ensemble import IsolationForest
 
 router = APIRouter(tags=["AI Anomaly Detection"])
 
@@ -42,6 +40,8 @@ def detect_anomalies(invoices: List[InvoiceData]):
     
     # Isolation Forest cần ít nhất 4 dữ liệu để tìm ra sự khác biệt
     if len(amounts) >= 4:
+        import numpy as np  # import muon: scikit-learn thuoc requirements-ml.txt
+        from sklearn.ensemble import IsolationForest
         X = np.array(amounts).reshape(-1, 1)
         # Giả định có tối đa 10% dữ liệu bị lỗi/bất thường
         clf = IsolationForest(contamination=0.1, random_state=42)

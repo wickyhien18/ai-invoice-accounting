@@ -5,7 +5,7 @@ import pytest
 
 from app.database import SessionLocal
 from app.models import Account, CategoryAlias, Invoice, ItemCategory, JournalEntry
-from app.services import gl_client
+from app.services import gl_client, gl_suggest
 from app.services.invoice_data import save_extraction
 from tests.conftest import login
 
@@ -16,6 +16,7 @@ CODES = {"111": "Tiền mặt", "153": "Công cụ, dụng cụ", "211": "TSCĐ"
 
 @pytest.fixture(autouse=True)
 def coa(db_setup):
+    gl_suggest._ML_CACHE.clear()  # cache ML cap module: khong xoa thi ket qua test nay ro sang test khac
     with SessionLocal() as db:
         db.add_all(Account(account_code=k, account_name=v) for k, v in CODES.items())
         db.commit()
@@ -300,9 +301,9 @@ def test_accounts_crud_and_search(client, H):
 
 
 def test_cannot_delete_account_in_use(client, H):
-    k = H(KTT)
+    k, v = H(KTT), H(KTV)  # but toan do KTV lap; xoa tai khoan la viec cua KTT
     inv = make_invoice()
-    client.put(f"/api/invoices/{inv}/journal-entries", json=body(("153", "331", "1")), headers=k)
+    assert client.put(f"/api/invoices/{inv}/journal-entries", json=body(("153", "331", "1")), headers=v).status_code == 200
     assert client.delete("/api/accounts/153", headers=k).status_code == 409
     c = client.post("/api/categories", json={"category_name": "Điện nước", "default_debit_account": "627"}, headers=k).json()["data"]
     assert client.delete("/api/accounts/627", headers=k).status_code == 409

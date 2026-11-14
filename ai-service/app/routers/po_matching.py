@@ -1,7 +1,6 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from sentence_transformers import SentenceTransformer, util
 
 router = APIRouter(tags=["AI PO Matching"])
 
@@ -11,6 +10,12 @@ _bge_m3_model = None
 def get_model():
     global _bge_m3_model
     if _bge_m3_model is None:
+        # Import tai day (khong o dau file): sentence-transformers nam trong requirements-ml.txt, nang vai GB,
+        # thieu no thi chi /match-po loi, ca ai-service van chay duoc
+        try:
+            from sentence_transformers import SentenceTransformer
+        except ImportError as e:
+            raise HTTPException(503, "Chưa cài sentence-transformers (xem requirements-ml.txt): chưa đối chiếu PO bằng AI được") from e
         # BAAI/bge-m3 hỗ trợ đa ngôn ngữ và xử lý tiếng Việt rất tốt
         _bge_m3_model = SentenceTransformer("BAAI/bge-m3")
     return _bge_m3_model
@@ -48,6 +53,7 @@ def match_po_with_bge_m3(payload: POMatchRequest):
     candidate_embs = model.encode(candidate_texts, convert_to_tensor=True)
 
     # Tính điểm tương đồng Cosine
+    from sentence_transformers import util
     cosine_scores = util.cos_sim(query_emb, candidate_embs)[0]
 
     # Tìm ứng viên có độ tương đồng cao nhất

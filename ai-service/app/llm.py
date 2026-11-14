@@ -10,6 +10,7 @@
     * gian cach: toi thieu LLM_MIN_INTERVAL giay giua hai lan goi (mac dinh 13 s -> khong vuot 5/phut)
     * ngan sach ngay: toi da LLM_DAILY_LIMIT lan goi/ngay (mac dinh 18, 0 = khong gioi han); het thi
       raise LLMUnavailable de noi goi chuyen sang quy tac regex thay vi bi 429
+- Sau khi nhan 429, nghi LLM_COOLDOWN giay (mac dinh 300) roi moi goi lai; trong luc nghi khong tinh luot.
 - LLMUnavailable: khong co khoa, khoa sai, het han muc (429) hoac may chu Google loi lien tiep.
   Noi goi nen bat loi nay de chuyen sang cach khong dung LLM (xem services/extractor.py).
 - Rieng tu: ban Gemini mien phi co the dung du lieu de cai tien san pham -> chi gui hoa don gia/da che.
@@ -32,6 +33,10 @@ class LLMUnavailable(RuntimeError):
     """Khong co API key, key sai, het han muc hoac may chu LLM khong tra loi."""
 
 
+class LLMQuotaExceeded(LLMUnavailable):
+    """Google tra 429 (het han muc). Sau loi nay module nghi LLM_COOLDOWN giay, khong goi them."""
+
+
 class LLMError(RuntimeError):
     """LLM tra loi nhung khong parse duoc thanh JSON."""
 
@@ -44,6 +49,7 @@ class _Retryable(Exception):
 _CACHE_DIR = Path(os.getenv("LLM_CACHE_DIR", Path(__file__).resolve().parents[1] / ".cache"))
 _lock = threading.Lock()
 _last_call = 0.0
+_cooldown_until = 0.0   # time.monotonic(): truoc moc nay khong goi Gemini nua (sau khi nhan 429)
 
 
 def _num(name: str, default: float) -> float:
@@ -89,6 +95,9 @@ def _reserve_call() -> None:
     Moi lan GUI yeu cau deu tinh (ke ca lan loi) vi Google cung tinh nhu vay."""
     global _last_call
     with _lock:
+        left = _cooldown_until - time.monotonic()
+        if left > 0:    # vua bi 429: goi tiep chi mat them luot ma van bi tu choi
+            raise LLMQuotaExceeded(f"Gemini vừa báo hết hạn mức (429); tạm nghỉ thêm {int(left) + 1} giây rồi mới gọi lại.")
         limit = int(_num("LLM_DAILY_LIMIT", 18))
         u = usage()
         if limit > 0 and u["used"] >= limit:
@@ -144,7 +153,7 @@ def _call_model(prompt: str, model: str, api_key: str) -> str:
     except errors.APIError as e:
         code = getattr(e, "code", None)
         if code == 429:
-            raise LLMUnavailable("Hết hạn mức Gemini (429). Hãy đợi một lúc hoặc đổi khóa khác.") from e
+            raise LLMQuotaExceeded("Hết hạn mức Gemini (429). Hãy đợi một lúc hoặc đổi khóa khác.") from e
         if code in (401, 403):
             raise LLMUnavailable(f"GEMINI_API_KEY bị từ chối ({code})") from e
         if code and code >= 500:
@@ -184,10 +193,15 @@ def generate_json(prompt: str, schema: dict | None = None) -> dict:
             data = _parse(_call_model(prompt, model, api_key))
             _cache_put(model, prompt, data)
             return data
+        except LLMQuotaExceeded:
+            global _cooldown_until
+            _cooldown_until = time.monotonic() + _num("LLM_COOLDOWN", 300)
+            raise
         except (_Retryable, LLMError) as e:
             last = e
             log.warning("LLM lan %d that bai: %s", attempt + 1, e)
-            time.sleep(2.0 * (attempt + 1))     # 503 do qua tai: doi lau hon truoc khi thu lai
+            if attempt < attempts - 1:          # khong doi them sau lan that bai cuoi: se bao loi ngay
+                time.sleep(2.0 * (attempt + 1))  # 503 do qua tai: doi lau hon truoc khi thu lai
     if isinstance(last, _Retryable):
         raise LLMUnavailable(f"Máy chủ Gemini lỗi liên tiếp: {last}") from last
     raise last  # type: ignore[misc]

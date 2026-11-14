@@ -389,3 +389,97 @@ def test_on_start_hook_called_when_image_really_starts(monkeypatch):
     finally:
         ocr.ON_START.reset(token)
     assert seen == ["start", "predict"] and not ocr.is_busy()
+
+
+# ---- Bug 24 / 25 (ban sao cua backend/tests/test_services.py: hai noi chuan hoa phai doc giong nhau)
+import pytest as _pytest  # noqa: E402
+from decimal import Decimal as _D  # noqa: E402
+
+from app.services.fields import canonical as _canonical, parse_money as _parse_money  # noqa: E402
+
+_MONEY_CASES = [
+    ("4.192.668", "4192668"), ("4,192,668", "4192668"), ("4192668", "4192668"), ("1100000.00", "1100000.00"),
+    ("49,632,990.00", "49632990.00"), ("1.100.000,50", "1100000.50"), ("17,462,720.00", "17462720.00"),
+    ("1.100", "1100"), ("1,100", "1100"), ("1,5", "1.5"), ("12.5", "12.5"), ("  3.882.100 đ", "3882100"),
+    ("1.234.567 VND", "1234567"), ("0", "0"),
+]
+
+
+@_pytest.mark.parametrize("raw,want", _MONEY_CASES)
+def test_ai_parse_money_formats(raw, want):
+    assert _parse_money(raw) == _D(want)
+
+
+def test_ai_canonical_money_and_mst():
+    assert _canonical("total_amount", "49,632,990.00") == "49632990"
+    assert _canonical("mst_seller", "0172A69957") == "0172A69957"
+    assert _canonical("mst_seller", "0487 211 601") == "0487211601"
+
+
+# ---- Bug 26: MST sai dinh dang khong duoc doi thanh MST nguoi mua; so tien trong PDF co chu khong bi tu sua
+_SAMPLE = """CÔNG TY CP VẬN TẢI MẪU THỬ DŨNG
+Mã số thuế (Tax code): {mst}
+Ký hiệu (Serial): C26MBF
+Số (No.): 0291609
+Ngày (date) 23 tháng (month) 06 năm (year) 2026
+Công ty TNHH Khách Hàng Mẫu Thử
+Mã số thuế (Tax code): 0109999990
+Cộng tiền hàng (Total amount):
+3.882.100
+Thuế suất GTGT (VAT rate): 8%        Tiền thuế GTGT (VAT amount):
+310.568
+Tổng tiền thanh toán (Total payment):
+{total}
+"""
+
+
+@_pytest.mark.parametrize("mst,want", [("0487211601", "0487211601"), ("048721160", "048721160"),
+                                       ("0487A11601", "0487A11601"), ("0487211601-001", "0487211601-001"),
+                                       ("0487 211 601", "0487211601")])
+def test_rules_seller_mst_never_falls_to_buyer(mst, want):
+    from app.services.rules import rule_extract
+    assert rule_extract(_SAMPLE.format(mst=mst, total="4.192.668"))["mst_seller"] == want
+
+
+def test_pdf_text_amounts_are_not_auto_repaired():
+    from app.services import extractor
+    text = _SAMPLE.format(mst="0487211601", total="4.192.670")        # tong lech 2 dong (qua dung sai 1 dong): loi that cua hoa don
+    r = extractor.extract_fields({"text": text, "source": "pdf_text"}, use_llm=False)
+    assert r["fields"]["total_amount"]["value"] == "4192670" and r["fields"]["total_amount"]["source"] == "rules"
+    assert any("khác tổng" in w for w in r["warnings"])
+    r = extractor.extract_fields({"text": text, "source": "ocr"}, use_llm=False)   # anh: OCR co the doc sai -> van sua
+    assert r["fields"]["total_amount"]["value"] == "4192668" and r["fields"]["total_amount"]["source"] == "computed"
+
+
+# ---- Bug 27: nghi sau 429, khong doi them sau lan that bai cuoi
+def test_llm_cooldown_after_429_does_not_burn_budget(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("LLM_COOLDOWN", "300")
+    monkeypatch.setattr(llm, "_cooldown_until", 0.0)
+    calls = []
+
+    def quota(p, m, k):
+        calls.append(1)
+        raise llm.LLMQuotaExceeded("429")
+    monkeypatch.setattr(llm, "_call_model", quota)
+    with pytest.raises(llm.LLMQuotaExceeded):
+        llm.generate_json("a")
+    used = llm.usage()["used"]
+    for t in ("b", "c", "d"):                      # trong luc nghi: bi tu choi ngay, khong goi, khong tinh luot
+        with pytest.raises(llm.LLMQuotaExceeded, match="tạm nghỉ"):
+            llm.generate_json(t)
+    assert len(calls) == 1 and llm.usage()["used"] == used
+    monkeypatch.setattr(llm, "_cooldown_until", 0.0)
+
+
+def test_llm_no_sleep_after_last_failed_attempt(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    sleeps = []
+    monkeypatch.setattr(llm.time, "sleep", lambda s: sleeps.append(s))
+
+    def boom(p, m, k):
+        raise llm._Retryable("503")
+    monkeypatch.setattr(llm, "_call_model", boom)
+    with pytest.raises(llm.LLMUnavailable):
+        llm.generate_json("x")
+    assert sleeps == [2.0]                          # chi doi giua lan 1 va lan 2 (mac dinh 2 lan thu)

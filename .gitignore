@@ -9,8 +9,6 @@ venv/
 node_modules/
 dist/
 build/
-frontend/package.json
-frontend/package-lock.json
 
 # IDE
 .vscode/
@@ -30,3 +28,7 @@ data_test/images
 data_test/pdf
 data_test/xml
 backend/storage
+
+# File tam do pytest tao ra
+backend/test_tmp.db
+backend/test_uploads_tmp/

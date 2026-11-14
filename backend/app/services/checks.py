@@ -35,9 +35,14 @@ def check_totals(before: Decimal | None, rate: Decimal | None, vat: Decimal | No
     return (not issues), issues
 
 
+def can_check_duplicate(inv: Invoice) -> bool:
+    """Can du 3 truong khoa moi doi chieu duoc; thieu thi khong the noi la 'khong trung'."""
+    return bool(inv.invoice_series and inv.invoice_number and inv.mst_seller)
+
+
 def find_duplicates(db: Session, inv: Invoice) -> list[int]:
     """Hoa don khac co cung ky hieu + so hoa don + MST nguoi ban."""
-    if not (inv.invoice_series and inv.invoice_number and inv.mst_seller):
+    if not can_check_duplicate(inv):
         return []
     q = select(Invoice.invoice_id).where(
         Invoice.invoice_series == inv.invoice_series,
@@ -57,9 +62,12 @@ def run_checks(db: Session, inv: Invoice) -> dict:
         details["mst"].append("Chưa có MST người bán" if not inv.mst_seller
                               else f"Giá trị đọc được là '{inv.mst_seller}', cần 10 hoặc 13 chữ số")
     total_ok, details["totals"] = check_totals(inv.total_before_tax, inv.vat_rate, inv.vat_amount, inv.total_amount)
+    dup_checked = can_check_duplicate(inv)
     dups = find_duplicates(db, inv)
+    if not dup_checked:
+        details["duplicate"].append("Thiếu ký hiệu, số hóa đơn hoặc MST người bán nên chưa kiểm tra trùng được")
     if dups:
         details["duplicate"].append("Trùng ký hiệu, số hóa đơn và MST với hóa đơn số " + ", ".join(f"#{d}" for d in dups))
     issues = details["mst"] + details["totals"] + details["duplicate"]
-    return {"mst_valid": mst_ok, "total_matches": total_ok, "duplicate": bool(dups),
+    return {"mst_valid": mst_ok, "total_matches": total_ok, "duplicate": bool(dups), "duplicate_checked": dup_checked,
             "duplicate_of": dups, "issues": issues, "issue_details": details}

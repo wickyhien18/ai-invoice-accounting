@@ -45,6 +45,9 @@ _RX = {
     # 'So 0291609' mat ':' : chi nhan 6-8 chu so de khong nham voi so nha ('So 240 duong ...')
     "number_loose": re.compile(r"(?<![a-z])(?<!mau )so\s*[:：;.]?\s*(\d{6,8})(?!\d)", re.I),
     "mst": re.compile(r"(?:ma\s*so\s*thue|mst|tax\s*code)" + _GAP + _SEP + r"\s*(\d[\d \-]{8,16}\d)", re.I),
+    "mst_label": re.compile(r"ma\s*so\s*thue|\bmst\b|tax\s*code", re.I),
+    # MST sai dinh dang (9 chu so, co chu cai...): lay nguyen token sau nhan de ke toan thay gia tri that (Bug 26)
+    "mst_token": re.compile(r"(?<![0-9A-Za-z\-])([0-9A-Za-z][0-9A-Za-z\-]{4,15})(?![0-9A-Za-z\-])"),
     "mst_any": re.compile(r"(?<![\d.,])(\d{10}(?:-\d{3})?)(?![\d.,])"),
     "date": re.compile(r"ngay" + r"\D{0,15}(\d{1,2})\D{1,25}?(\d{1,2})\D{1,25}?(\d{4})", re.I),
     # 'Ngby (date) 23 thang (month) 06 nam (year) 2026': chu 'Ngay' bi doc hong nhung 'thang'/'nam' con
@@ -94,11 +97,21 @@ def rule_extract(text: str) -> dict[str, str | None]:
     if out["invoice_date"] and parse_date(out["invoice_date"]) is None:
         out["invoice_date"] = None
 
-    # MST nguoi ban = MST dau tien trong van ban
-    mst_line = next((i for i, ln in enumerate(flines) if _RX["mst"].search(ln)), None)
+    # MST nguoi ban = MST o dong co nhan MST dau tien. Dong co nhan ma khong doc duoc dung 10/13 chu so thi lay
+    # token lien sau nhan (MST 9 chu so, co chu cai) thay vi roi sang MST dau tien khop duoc - la MST nguoi mua (Bug 26)
+    mst_line = next((i for i, ln in enumerate(flines) if _RX["mst_label"].search(ln)), None)
     if mst_line is not None:
-        out["mst_seller"] = canonical("mst_seller", _RX["mst"].search(flines[mst_line]).group(1))
-    else:
+        ln = flines[mst_line]
+        m = _RX["mst"].search(ln)
+        if m:
+            out["mst_seller"] = canonical("mst_seller", m.group(1))
+        else:
+            after = ln[_RX["mst_label"].search(ln).end():]
+            tok = next((t.group(1) for t in _RX["mst_token"].finditer(after)
+                        if sum(c.isdigit() for c in t.group(1)) >= 5), None)
+            if tok:
+                out["mst_seller"] = canonical("mst_seller", tok)
+    if out["mst_seller"] is None:
         m = _RX["mst_any"].search(folded)
         if m:
             out["mst_seller"] = canonical("mst_seller", m.group(1))

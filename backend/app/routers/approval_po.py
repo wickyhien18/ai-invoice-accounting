@@ -29,6 +29,10 @@ class POCreate(BaseModel):
 
 router = APIRouter(prefix="/api", tags=["Gói C - Duyệt & PO"])
 
+# Nhãn tiếng Việt của trạng thái hóa đơn, dùng cho thông báo lỗi (không in mã nội bộ ra cho người dùng)
+STATUS_VI = {"dang_xu_ly": "đang xử lý", "loi_xu_ly": "lỗi xử lý", "cho_xac_nhan": "chờ xác nhận",
+             "da_luu": "đã lưu", "cho_duyet": "chờ duyệt", "da_duyet": "đã duyệt", "tu_choi": "bị từ chối"}
+
 # ---------------------------------------------------------
 # Hàm Trợ Lý: Đảm bảo luôn có PO ứng với các nhà cung cấp trên hóa đơn
 # ---------------------------------------------------------
@@ -221,7 +225,9 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), curren
     invoice = db.query(Invoice).filter(Invoice.invoice_id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
-    
+    if invoice.status != "cho_duyet":
+        raise HTTPException(status_code=409, detail=f"Chỉ duyệt được hóa đơn đang chờ duyệt (hiện: {STATUS_VI.get(invoice.status, invoice.status)})")
+
     invoice.status = "da_duyet"
     invoice.approved_by = current_user.user_id 
     invoice.approved_at = datetime.now()
@@ -239,7 +245,9 @@ async def reject_invoice(invoice_id: int, reason: str, db: Session = Depends(get
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn")
     
-    if not reason:
+    if invoice.status != "cho_duyet":
+        raise HTTPException(status_code=409, detail=f"Chỉ từ chối được hóa đơn đang chờ duyệt (hiện: {STATUS_VI.get(invoice.status, invoice.status)})")
+    if not reason or not reason.strip():
         raise HTTPException(status_code=400, detail="Vui lòng cung cấp lý do từ chối")
         
     invoice.status = "tu_choi"

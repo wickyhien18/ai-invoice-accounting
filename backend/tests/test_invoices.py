@@ -106,7 +106,7 @@ def test_check_ok_and_duplicate(client, monkeypatch):
     up(client, "a.xml", xml_bytes("HD001"))
     h = H(client)
     c = client.post("/api/invoices/1/check", headers=h).json()["data"]
-    assert c["mst_valid"] is True and c["total_matches"] is True and c["duplicate"] is False
+    assert c["mst_valid"] is True and c["total_matches"] is True and c["duplicate"] is False and c["duplicate_checked"] is True
     up(client, "again.xml", xml_bytes("HD001"))
     c = client.post("/api/invoices/2/check", headers=h).json()["data"]
     assert c["duplicate"] is True and c["duplicate_of"] == [1]
