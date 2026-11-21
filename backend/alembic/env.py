@@ -9,7 +9,7 @@ import app.models  # noqa: F401  (dang ky du 9 bang)
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)  # khong tat log cua uvicorn khi chay trong app
 target_metadata = Base.metadata
 
 

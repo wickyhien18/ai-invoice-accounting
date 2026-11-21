@@ -166,3 +166,18 @@ def test_big_file_is_split_into_chunks(client):
         n = file_store.save_file(db, inv.invoice_id, data)
         db.commit()
         assert n == 9 and file_store.read_file(db, inv.invoice_id) == data
+
+
+def test_backfill_missing_restores_from_local_disk(client):
+    """Hoa don nap truoc khi co bang invoice_file_chunks: bo sung tu file tren dia, chay lai khong nhan doi."""
+    from app.models import InvoiceFileChunk
+    from app.services import file_store
+    iid = upload_xml(client)
+    raw = (DATA / "xml" / "HD001.xml").read_bytes()
+    with SessionLocal() as db:
+        db.query(InvoiceFileChunk).filter_by(invoice_id=iid).delete()
+        db.commit()
+        assert file_store.read_file(db, iid) is None
+        assert file_store.backfill_missing(db) >= 1
+        assert file_store.read_file(db, iid) == raw
+        assert file_store.backfill_missing(db) == 0

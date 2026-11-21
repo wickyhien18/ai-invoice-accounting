@@ -2,10 +2,10 @@
 nen tang free (Render) xoa dia moi lan khoi dong lai, nen khi can file ma dia khong con thi dung lai tu CSDL."""
 from pathlib import Path
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import Session
 
-from app.config import settings
+from app.config import ROOT_DIR, settings
 from app.models import Invoice, InvoiceFileChunk
 
 CHUNK_SIZE = 1024 * 1024  # 1 MiB moi dong, du nho de khong cham gioi han dong cua TiDB
@@ -52,3 +52,27 @@ def ensure_local(db: Session, inv: Invoice) -> Path | None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return path
+
+
+MAX_BYTES = 10 * 1024 * 1024
+
+
+def backfill_missing(db: Session) -> int:
+    """Hoa don chua co ban trong CSDL (nap truoc khi co bang invoice_file_chunks): lay tu dia cuc bo, hoac voi
+    hoa don demo thi lay tu data_test. Chay lai nhieu lan van an toan. Tra ve so hoa don da bo sung."""
+    pending = db.scalars(select(Invoice).where(
+        ~exists().where(InvoiceFileChunk.invoice_id == Invoice.invoice_id))).all()
+    n = 0
+    for inv in pending:
+        path = local_path(inv)
+        if path is None or not path.is_file():
+            path = None
+            if inv.file_path.startswith("demo") and "_" in inv.file_path:
+                name = inv.file_path.split("_", 1)[1]
+                path = next((p for sub in ("images", "pdf", "xml") if (p := ROOT_DIR / "data_test" / sub / name).is_file()), None)
+        if path is None or path.stat().st_size > MAX_BYTES:
+            continue
+        save_file(db, inv.invoice_id, path.read_bytes())
+        n += 1
+    db.commit()
+    return n

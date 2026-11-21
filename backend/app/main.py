@@ -6,11 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import approval_po, auth, b_catalog, b_entries, b_fields, health, invoices, mock_contract, b_review
+from app.db_migrate import upgrade_and_backfill
 from app.services.invoice_data import recover_stuck_in_thread
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    upgrade_and_backfill()  # nang cap bang + bo sung file goc vao CSDL (local giong ban deploy)
     recover_stuck_in_thread()  # hoa don dang do vi backend vua tat/reload thi xu ly lai, khong de ket 'dang xu ly'
     yield
 
