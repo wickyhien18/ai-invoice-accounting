@@ -26,6 +26,6 @@ app.include_router(mock_contract.router)
 app.include_router(po_matching.router)  # <--- Đăng ký router đối chiếu PO
 app.include_router(anomaly.router)
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
     return {"status": "ok", "ocr_ready": ocr.is_ready()}
