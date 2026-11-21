@@ -14,9 +14,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import Invoice, InvoiceField, JournalEntry, MatchingResult, User
+from app.models import Invoice, InvoiceField, InvoiceFileChunk, JournalEntry, MatchingResult, User
 from app.security import get_current_user, require_role, verify_password
-from app.services import ai_client
+from app.services import ai_client, file_store
 from app.services.checks import run_checks
 from app.services.invoice_data import display_name, is_running, process_invoice, run_in_background
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
@@ -88,6 +88,8 @@ def upload_invoice(background: BackgroundTasks, file: UploadFile = File(...),
 
     inv = Invoice(uploaded_by=user.user_id, file_path=stored, file_type=file_type, status="dang_xu_ly")
     db.add(inv)
+    db.flush()
+    file_store.save_file(db, inv.invoice_id, data)  # ban goc nam trong CSDL, dia chi la bo nho dem
     db.commit()
     if file_type == "xml":
         process_invoice(db, inv.invoice_id)  # nhanh, khong can AI nen xu ly ngay
@@ -148,9 +150,8 @@ def get_invoice(invoice_id: int, db: Session = Depends(get_db), _: User = Depend
 def get_invoice_file(invoice_id: int, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """Chung tu tai chinh: bat buoc dang nhap (Bearer token)."""
     inv = _get_or_404(db, invoice_id)
-    base = settings.upload_dir.resolve()
-    path = (base / inv.file_path).resolve()
-    if base not in path.parents or not path.is_file():  # chan ../ va file mat
+    path = file_store.ensure_local(db, inv)  # dia mat sau khi khoi dong lai thi dung lai tu CSDL
+    if path is None:
         raise HTTPException(404, "Không tìm thấy file gốc")
     return FileResponse(path, media_type=MEDIA.get(path.suffix.lower(), "application/octet-stream"),
                         filename=display_name(inv.file_path), content_disposition_type="inline",
@@ -213,12 +214,12 @@ def delete_invoice(invoice_id: int, body: DeleteIn, db: Session = Depends(get_db
     if inv.export_status == "da_xuat":
         raise HTTPException(409, "Hóa đơn đã xuất bảng kê, không thể xóa")
     stored = inv.file_path
-    for model in (JournalEntry, MatchingResult, InvoiceField):
+    for model in (JournalEntry, MatchingResult, InvoiceField, InvoiceFileChunk):
         db.execute(delete(model).where(model.invoice_id == invoice_id))
     db.delete(inv)
     db.commit()
     base = settings.upload_dir.resolve()
     path = (base / stored).resolve()
-    if base in path.parents:   # chi xoa file nam trong thu muc upload
+    if base in path.parents:   # chi xoa file nam trong thu muc upload (ban trong CSDL da xoa o tren)
         path.unlink(missing_ok=True)
     return {"data": {"deleted": invoice_id}}

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Invoice, InvoiceField
-from app.services import ai_client
+from app.services import ai_client, file_store
 from app.services.normalize import FIELD_NAMES, canonical, to_column
 from app.services.xml_parser import XmlInvoiceError, parse_invoice_xml
 
@@ -69,6 +69,7 @@ def process_invoice(db: Session, invoice_id: int) -> str:
     if inv is None:
         return "khong_ton_tai"
     try:
+        file_store.ensure_local(db, inv)  # dung lai file tu CSDL neu dia da bi xoa
         result = extract_fields(inv)
         save_extraction(db, inv, result["fields"])
         inv.status = "cho_xac_nhan"

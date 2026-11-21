@@ -137,3 +137,32 @@ def test_batch_review_save_then_send_all(client):
     assert client.post(f"/api/invoices/{ids[2]}/save-review", headers=ktv).status_code == 200
     assert client.post("/api/invoices/submit-batch", json={"invoice_ids": []}, headers=ktv).json()["data"]["sent"] == 0
     assert client.post("/api/invoices/submit-batch", json={"invoice_ids": [ids[2]]}, headers=ktv).json()["data"]["sent"] == 1
+
+
+def test_file_is_stored_in_db_and_survives_disk_loss(client):
+    """Ban goc nam trong CSDL: xoa file tren dia (nhu Render khoi dong lai) van xem va xu ly lai duoc."""
+    from app.models import InvoiceFileChunk
+    from app.services import file_store
+    raw = (DATA / "xml" / "HD001.xml").read_bytes()
+    iid = upload_xml(client)
+    with SessionLocal() as db:
+        assert file_store.read_file(db, iid) == raw
+        path = settings.upload_dir / db.get(Invoice, iid).file_path
+    path.unlink()
+    r = client.get(f"/api/invoices/{iid}/file", headers=login(client, KTT))
+    assert r.status_code == 200 and r.content == raw
+    assert delete(client, iid).status_code == 200
+    with SessionLocal() as db:
+        assert db.query(InvoiceFileChunk).filter_by(invoice_id=iid).count() == 0
+
+
+def test_big_file_is_split_into_chunks(client):
+    from app.services import file_store
+    data = bytes(range(256)) * (9 * 1024 * 4)   # ~9 MB
+    with SessionLocal() as db:
+        inv = Invoice(uploaded_by=1, file_path="x_big.pdf", file_type="pdf", status="cho_xac_nhan")
+        db.add(inv)
+        db.flush()
+        n = file_store.save_file(db, inv.invoice_id, data)
+        db.commit()
+        assert n == 9 and file_store.read_file(db, inv.invoice_id) == data

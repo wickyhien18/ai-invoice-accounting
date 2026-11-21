@@ -20,6 +20,7 @@ from sqlalchemy import select  # noqa: E402
 from app.config import ROOT_DIR, settings  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.models import Invoice, User  # noqa: E402
+from app.services.file_store import save_file  # noqa: E402
 from app.services.invoice_data import save_extraction  # noqa: E402
 
 DATA = ROOT_DIR / "data_test"
@@ -68,6 +69,7 @@ def seed_invoices() -> int:
                 inv.approved_by = approver.user_id
             db.add(inv)
             db.flush()
+            save_file(db, inv.invoice_id, src.read_bytes())
             fields = build_fields(lab, random.Random(lab["id"]))
             if kind == "xml":
                 for f in fields.values():
