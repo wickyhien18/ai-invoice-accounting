@@ -1,0 +1,15 @@
+--extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cpu/
+paddlepaddle==3.2.0
+fastapi
+uvicorn[standard]
+python-dotenv
+python-multipart
+pillow
+rapidfuzz
+google-genai
+httpx
+paddleocr
+numpy
+pymupdf
+scikit-learn
+sentence-transformers

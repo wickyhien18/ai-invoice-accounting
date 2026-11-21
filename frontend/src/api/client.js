@@ -1,4 +1,6 @@
 // Ham goi API dung chung. Token luu o localStorage (chi cho phat trien).
+// Khi deploy: dat VITE_API_BASE = dia chi backend (VD https://xxx.onrender.com). De trong khi chay local (Vite proxy /api).
+const BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
 const KEY = "token";
 export const getToken = () => localStorage.getItem(KEY);
 export const setToken = (t) => (t ? localStorage.setItem(KEY, t) : localStorage.removeItem(KEY));
@@ -16,7 +18,7 @@ async function fail(res) {
 // body la object -> gui JSON; body la FormData -> gui multipart (de trinh duyet tu dat Content-Type)
 export async function api(path, { method = "GET", body } = {}) {
   const isForm = body instanceof FormData;
-  const res = await fetch(path, {
+  const res = await fetch(BASE + path, {
     method,
     headers: authHeaders(isForm ? {} : { "Content-Type": "application/json" }),
     body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
@@ -27,7 +29,7 @@ export async function api(path, { method = "GET", body } = {}) {
 
 // Tai file can dang nhap (VD anh hoa don): the <img>/<a> khong gui duoc token, nen lay blob roi tao URL tam.
 export async function fetchBlobUrl(path) {
-  const res = await fetch(path, { headers: authHeaders() });
+  const res = await fetch(BASE + path, { headers: authHeaders() });
   if (!res.ok) await fail(res);
   return URL.createObjectURL(await res.blob());
 }
@@ -36,7 +38,7 @@ export async function fetchBlobUrl(path) {
 export function uploadWithProgress(path, formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", path);
+    xhr.open("POST", BASE + path);
     const t = getToken();
     if (t) xhr.setRequestHeader("Authorization", `Bearer ${t}`);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));

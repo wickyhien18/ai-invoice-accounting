@@ -1,0 +1,32 @@
+# Blueprint Render cho backend. Tao tai https://dashboard.render.com -> New -> Blueprint -> chon repo.
+services:
+  - type: web
+    name: ai-invoice-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "4000"
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        value: ai_invoice_db
+      - key: DB_SSL
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: SEED_DEMO
+        value: "1"
