@@ -11,3 +11,6 @@ PyJWT
 httpx
 pytest
 defusedxml
+openpyxl
+numpy
+scikit-learn
