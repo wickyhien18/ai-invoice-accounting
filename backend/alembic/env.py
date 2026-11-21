@@ -21,7 +21,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(settings.database_url)
+    from app.database import engine  # dung chung cau hinh (TLS cho MySQL cloud)
     with engine.connect() as conn:
         context.configure(connection=conn, target_metadata=target_metadata,
                           render_as_batch=conn.dialect.name == "sqlite")

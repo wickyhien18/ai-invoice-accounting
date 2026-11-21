@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -14,10 +15,13 @@ async def lifespan(_: FastAPI):
     yield
 
 
+# CORS_ORIGINS: cac origin duoc phep, cach nhau dau phay (VD https://ten-app.vercel.app). Local dung mac dinh.
+_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if o.strip()]
+
 app = FastAPI(title="AI Invoice Accounting - Backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_ORIGINS,
     allow_methods=["*"], allow_headers=["*"],
 )
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
