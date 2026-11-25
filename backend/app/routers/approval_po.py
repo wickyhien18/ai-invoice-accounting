@@ -1,13 +1,13 @@
 import numpy as np
 from sklearn.ensemble import IsolationForest
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal
 from pathlib import Path
 import os
 import httpx
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -36,8 +36,8 @@ STATUS_VI = {"dang_xu_ly": "đang xử lý", "loi_xu_ly": "lỗi xử lý", "cho
 # ---------------------------------------------------------
 # Hàm Trợ Lý: Đảm bảo luôn có PO ứng với các nhà cung cấp trên hóa đơn
 # ---------------------------------------------------------
-def ensure_pos_for_invoices(db: Session, current_user_id: int = 1):
-    invoices = db.query(Invoice).all()
+def ensure_pos_for_invoices(db: Session, current_user_id: int = 1, target_invoices: list = None):
+    invoices = target_invoices if target_invoices is not None else db.query(Invoice).all()
     if not invoices:
         return
 
@@ -71,11 +71,11 @@ def ensure_pos_for_invoices(db: Session, current_user_id: int = 1):
 # ---------------------------------------------------------
 # Hàm Trợ Lý: Đối chiếu PO (Ưu tiên AI bge-m3 -> Fallback DB Direct)
 # ---------------------------------------------------------
-async def perform_bge_m3_matching(invoice: Invoice, db: Session):
+async def perform_bge_m3_matching(invoice: Invoice, db: Session, pos_cache: list = None):
     if not invoice.seller_name or not invoice.total_amount:
         return None
 
-    pos = db.query(PurchaseOrder).all()
+    pos = pos_cache if pos_cache is not None else db.query(PurchaseOrder).all()
     if not pos:
         return None
 
@@ -101,7 +101,7 @@ async def perform_bge_m3_matching(invoice: Invoice, db: Session):
                 match_data = resp.json()
                 best_po_id = match_data.get("best_po_id")
                 if best_po_id:
-                    matched_po = db.query(PurchaseOrder).filter(PurchaseOrder.po_id == best_po_id).first()
+                    matched_po = next((p for p in pos if p.po_id == best_po_id), None)
     except Exception:
         # Nếu AI Service bị lỗi / offline / timeout, chuyển sang phương án dự phòng bên dưới
         pass
@@ -233,7 +233,7 @@ async def approve_invoice(invoice_id: int, db: Session = Depends(get_db), curren
     invoice.approved_at = datetime.now()
     
     # Đảm bảo PO khả dụng & tự động thực hiện đối chiếu
-    ensure_pos_for_invoices(db, current_user.user_id)
+    ensure_pos_for_invoices(db, current_user.user_id, [invoice])
     await perform_bge_m3_matching(invoice, db)
     
     db.commit()
@@ -260,24 +260,45 @@ async def reject_invoice(invoice_id: int, reason: str, db: Session = Depends(get
 # Nhiệm vụ C4 & C7: Xuất bảng kê (Chuẩn Mẫu 01-2/GTGT phân nhóm + Kết quả PO thật)
 # ---------------------------------------------------------
 @router.post("/exports/sheet")
-async def export_sheet(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    # 0. Tự động kiểm tra và sinh PO cho tất cả các nhà cung cấp chưa có PO
-    ensure_pos_for_invoices(db, current_user.user_id)
+async def export_sheet(
+    hours: int | None = Query(None, description="Lọc hóa đơn được duyệt trong N giờ gần nhất"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    # 1. Lấy danh sách hóa đơn ĐÃ DUYỆT (có áp dụng bộ lọc giờ nếu truyền vào)
+    base_query = db.query(Invoice).filter(Invoice.status == "da_duyet")
+    cutoff_time = None
+    if hours:
+        cutoff_time = datetime.now() - timedelta(hours=hours)
+        base_query = base_query.filter(Invoice.approved_at >= cutoff_time)
 
-    # 1. Lấy hóa đơn ĐÃ DUYỆT
-    unexported_invoices = db.query(Invoice).filter(
-        Invoice.status == "da_duyet"
-    ).all()
+    target_invoices = base_query.all()
 
-    if not unexported_invoices:
-        raise HTTPException(status_code=400, detail="Không có hóa đơn nào ở trạng thái 'Đã duyệt'.")
+    if not target_invoices:
+        detail_msg = (
+            f"Không có hóa đơn nào được duyệt trong {hours} giờ qua."
+            if hours
+            else "Không có hóa đơn nào ở trạng thái 'Đã duyệt'."
+        )
+        raise HTTPException(status_code=400, detail=detail_msg)
 
-    # 2. Ép thực hiện đối chiếu PO cho tất cả hóa đơn ở trạng thái đã duyệt
-    for inv in unexported_invoices:
-        await perform_bge_m3_matching(inv, db)
+    # 2. Chỉ sinh PO & đối chiếu cho các hóa đơn nằm trong danh sách cần xuất (tối ưu tốc độ)
+    ensure_pos_for_invoices(db, current_user.user_id, target_invoices)
+    all_pos = db.query(PurchaseOrder).all()
+
+    # Chỉ chạy đối chiếu lại cho những hóa đơn chưa có MatchingResult để tránh gọi AI lặp lại gây chậm
+    existing_match_ids = {
+        m.invoice_id
+        for m in db.query(MatchingResult.invoice_id).filter(
+            MatchingResult.invoice_id.in_([inv.invoice_id for inv in target_invoices])
+        ).all()
+    }
+    for inv in target_invoices:
+        if inv.invoice_id not in existing_match_ids:
+            await perform_bge_m3_matching(inv, db, all_pos)
 
     # 3. Query lấy dữ liệu kèm JOIN với MatchingResult và PurchaseOrder
-    query_result = db.query(
+    join_query = db.query(
         Invoice, 
         MatchingResult, 
         PurchaseOrder.po_number
@@ -287,7 +308,11 @@ async def export_sheet(db: Session = Depends(get_db), current_user = Depends(get
         PurchaseOrder, MatchingResult.po_id == PurchaseOrder.po_id
     ).filter(
         Invoice.status == "da_duyet"
-    ).all()
+    )
+    if cutoff_time is not None:
+        join_query = join_query.filter(Invoice.approved_at >= cutoff_time)
+
+    query_result = join_query.all()
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -464,13 +489,15 @@ async def export_sheet(db: Session = Depends(get_db), current_user = Depends(get
     export_dir = BASE_DIR / "storage" / "exports"
     export_dir.mkdir(parents=True, exist_ok=True)
     
-    filename = f"Bang_ke_01_2_GTGT_PO_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    prefix = f"Bang_ke_01_2_GTGT_{hours}h_" if hours else "Bang_ke_01_2_GTGT_PO_"
+    filename = f"{prefix}{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     filepath = export_dir / filename
     
     wb.save(str(filepath))
     
+    scope_text = f" (duyệt trong {hours}h qua)" if hours else ""
     return {
-        "message": f"Đã xuất thành công bảng kê cho {len(query_result)} hóa đơn.", 
+        "message": f"Đã xuất thành công bảng kê cho {len(query_result)} hóa đơn{scope_text}.", 
         "download_url": f"/api/exports/download/{filename}"
     }
 
@@ -536,7 +563,7 @@ async def match_po_with_invoice(
     if not invoice:
         raise HTTPException(status_code=404, detail="Không tìm thấy hóa đơn.")
 
-    ensure_pos_for_invoices(db, current_user.user_id)
+    ensure_pos_for_invoices(db, current_user.user_id, [invoice])
 
     match_rec = await perform_bge_m3_matching(invoice, db)
     
